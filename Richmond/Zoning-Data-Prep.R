@@ -63,7 +63,7 @@ CoR_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmond Ci
   rename(Code = Name) #%>%
   #select(Code, County, Year, geometry)
   
-
+#----
 #Henrico
 Henrico_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Henrico/Zoning.shp")) %>%
   mutate(County = "Henrico",
@@ -71,6 +71,7 @@ Henrico_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Henrico
   rename(Code = ZONE_NAME) #%>%
   #select(Code, County, Year, geometry)
 
+#----
 #Chesterfield
 Chesterfield_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Chesterfield/Zoning.shp")) %>%
   mutate(County = "Chesterfield",
@@ -116,19 +117,18 @@ Colonial_Heights_Zoning <- st_read(paste0("https://services.arcgis.com/xg1QZ4hgU
   select(ZONINGCODE, YEAR_BUILT, ParcelID, geometry)
 
 # Save the data to a CSV file
-write.csv(Colonial_Heights_Zoning, paste0(onedrivepath, "Zoning data/Richmond MSA/Colonial Heights/Colonial_Heights_zoning.csv"), row.names = FALSE)
-
-# Save the data to a shapefile
-st_write(Colonial_Heights_Zoning, paste0(onedrivepath, "Zoning data/Richmond MSA/Colonial Heights/Colonial_Heights_zoning.shp"))
+# write.csv(Colonial_Heights_Zoning, paste0(onedrivepath, "Zoning data/Richmond MSA/Colonial Heights/Colonial_Heights_zoning.csv"), row.names = FALSE)
+# 
+# # Save the data to a shapefile
+# st_write(Colonial_Heights_Zoning, paste0(onedrivepath, "Zoning data/Richmond MSA/Colonial Heights/Colonial_Heights_zoning.shp"))
 
 #Reload (to test file) and tody
 Colonial_Heights_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Colonial Heights/Colonial_Heights_zoning.shp")) %>%
-  mutate(County = "Colonial_Heights") %>%
-  rename(Code = ZONINGCODE,
-         Year = 2019) #%>%
+  mutate(County = "Colonial Heights",
+         Year = 2019) %>%
+  rename(Code = "ZONINGCODE") %>%
+  filter(!Code == "NA") #%>%
 #select(Code, County, Year, geometry) %>%
-
-CHECK NAs
 
 #----
 #Goochland County
@@ -162,24 +162,96 @@ Goochland_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Gooch
   rename(Code = Zoning) #%>%
 #select(Code, County, Year, geometry) %>%
 
+#----
+#Hanover
+Hanover_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Hanover/Zoning.shp")) %>%
+  mutate(County = "Hanover",
+         Year_Created = 2019,
+         Last_Updated = 2024) %>%
+  rename(Code = CLASS) #%>%
+#select(Code, County, Year, geometry) %>%
 
 
+#----
+#Powhattan
+Powhattan_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Powhattan/Zoning.shp")) %>%
+  mutate(County = "Powhattan",
+         Year_Created = NA,
+         Last_Updated = 2024) %>%
+  rename(Code = ZONING) #%>%
+#select(Code, County, Year, geometry)
 
 
+#----
+#Sussex
+#Extract data from ArcGIS directory
+Sussex_Zoning <- st_read(paste0("https://services3.arcgis.com/nJbIFHiSnaX0z0hS/ArcGIS/rest/services/SussexParcels_Zoning/FeatureServer/1", 
+                                   "/query?where=1=1&outFields=*&f=json")) %>%   #Select variables to reduce export size
+  select(zoning, geometry)
 
+# Save the data to a CSV file
+# write.csv(Sussex_Zoning, paste0(onedrivepath, "Zoning data/Richmond MSA/Sussex/Sussex_zoning.csv"), row.names = FALSE)
+# # 
+# # # Save the data to a shapefile
+# st_write(Sussex_Zoning, paste0(onedrivepath, "Zoning data/Richmond MSA/Sussex/Sussex_zoning.shp"))
+# 
+#Reload (to test file) and tody
+Sussex_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Sussex/Sussex_zoning.shp")) %>%
+  mutate(County = "Sussex",
+         Year_Created = 2021,
+         Last_Updated = 2024) %>%
+  rename(Code = "zoning") #%>%
+#select(Code, County, Year, geometry) %>%
+
+#----
+#Hopewell city
+Hopewell_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Hopewell/Hopewell Zoning.gdb")) %>%
+  mutate(County = "Hopewell",
+         Year_Created = NA,
+         Last_Updated = 2024) %>%
+  rename(Code = ZONE_ID) #%>%
+#select(Code, County, Year, geometry)
+
+#----
+#King and Queen County
+KingQueen_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/King and Queen/Zoning_Boundaries.shp")) %>%
+  mutate(County = "King and Queen",
+         Year_Created = NA,
+         Last_Updated = 2024) %>%
+  rename(Code = ZONING) 
+
+#----
+#Prince George
+PrinceGeorge_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Prince George/Zoning.shp")) %>%
+  mutate(County = "Prince George",
+         Year_Created = NA,
+         Last_Updated = 2024) %>%
+  rename(Code = ZoningClas) 
+
+
+  
 
 #For initial visualizing of Richmond
 ggplot() + 
   geom_sf(data = CentralCities_2020, fill = NA, color = "black", linewidth = 0.65) +
-  geom_sf(data = CBSA_2020, color = "black", fill = "black", linewidth = 0.6) +
-  geom_sf(data = Colonial_Heights_Zoning, aes(fill = Code), col = "white") + 
-  geom_sf(data = Dinwiddie_Zoning, aes(fill = Code), col = "white") + 
-  geom_sf(data = Goochland_Zoning, aes(fill = Code), col = "white") + 
-  geom_sf(data = CoR_Zoning, aes(fill = Code), col = "white") + 
-  geom_sf(data = Henrico_Zoning, aes(fill = Code), col = "white") + 
-  geom_sf(data = Chesterfield_Zoning, aes(fill = Code), col = "white") + 
+  geom_sf(data = CBSA_2020, color = "black", fill = "white", linewidth = 0.6) +
+  geom_sf(data = Amelia_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = Colonial_Heights_Zoning, aes(fill = Code), col = NA) +
+  geom_sf(data = Chesterfield_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = CoR_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = Dinwiddie_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = Goochland_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = Hanover_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = Henrico_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = Hopewell_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = KingQueen_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = Powhattan_Zoning, aes(fill = Code), col = "white") + 
+  geom_sf(data = PrinceGeorge_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = Sussex_Zoning, aes(fill = Code), col = "white") +
   # geom_sf(data = Counties_2020[Counties_2020$NAME == "Chesterfield", ], 
   #         fill = NA, color = "black", linewidth = 0.20) + 
   theme_void() +
-  theme(legend.spacing.y = unit(.1, "lines")) 
+  theme(legend.spacing.y = unit(.1, "lines")) +
+  geom_sf(data = Counties_2020, fill = NA, color = "black", linewidth = 0.65) 
+
 
