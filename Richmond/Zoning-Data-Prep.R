@@ -229,29 +229,122 @@ PrinceGeorge_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Pr
   rename(Code = ZoningClas) 
 
 
+#----
+#Charles City
+Charles_City <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Charles City/CC_Zoning.shp")) %>%
+  mutate(Code = case_when(
+    is.na(Code) ~ "A-1",
+    TRUE ~ Code
+  )) %>%
+  mutate(County = "Charles City",
+         Year_Created = 2020,
+         Last_Updated = 2020) 
+
+#----
+#New Kent
+NewKent_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/New Kent/Zoning.shp")) %>%
+  mutate(County = "New Kent",
+         Year_Created = NA,
+         Last_Updated = 2024) %>%
+  rename(Code = ZONING) 
+
+
+
+
+
+#----
+#King William
+#NOTE: King William data comes from two sources (KW County and West Point town separately).  
+  #Need to first digitize the KW County and they join the West Point point data
+
+#Load King William parcels
+# King_William_Parcels <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/King William/Parcels/King_William_Parcels.shp")) 
+# 
+# #Load King William parcels
+# King_William_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/King William/King_William_zoning.shp")) 
+
+#Load zoning data for county
+  #This after coding parcels in QGIS
+King_William_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/King William/King William without WP/King_William_Zoning.shp"))
+
+#Load West point town point data
+WestPoint_point_parcels <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/King William/Owner Boundaries (Proximity).geojson")) %>%
+  select(LOCALITY, Zoning, geometry)
   
+#Create centroids for point in polygon
+WestPoint_Centroids <- st_centroid(WestPoint_point_parcels)
+
+# Convert data frames to sf objects
+WestPoint_Centroids <- st_transform(WestPoint_Centroids, st_crs(King_William_Zoning))
+
+# King_William_Parcels <- st_as_sf(King_William_Parcels, wkt = "geometry", crs = 4326) # Adjust the WKT column and CRS accordingly
+# WestPoint_Centroids <- st_as_sf(WestPoint_Centroids, coords = c(geometry), crs = 4326)
+
+#Create the point in polygon count
+joined_sf <- st_join(King_William_Zoning, WestPoint_Centroids, join = st_intersects) 
+
+#Tidy the merge of point and polygon
+joined_sf <- joined_sf %>%
+  rename(County = LOCALITY.x,
+         Town = LOCALITY.y) %>%
+   mutate(Zoning_Code = coalesce(Code, Zoning)) %>%
+   select(-Code, -Zoning) %>%
+  filter(!st_is_empty(geometry), !is.na(geometry)) %>%
+  mutate(Zoning_Code = ifelse(Zoning_Code == "NA", NA, Zoning_Code)) %>%
+  mutate(Town = ifelse(is.na(Town), "Not West Point", Town)) %>%
+  mutate(Zoning_Code = ifelse(is.na(Zoning_Code) & Town == "Not West Point", "A-C", Zoning_Code))
+
+#Viz
+ggplot() + 
+  geom_sf(data = joined_sf, aes(fill = Zoning_Code), color = "black", linewidth = 0.05) 
+
+#Export the completed dataset
+# st_write(joined_sf, paste0(onedrivepath, "Zoning data/Richmond MSA/King William/King William and West Point/King_William_zoning_draft.shp"))
+
+#Reload zoning data after tidying in QGIS
+King_William_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/King William/King_William_zoning.shp")) %>%
+  rename(Code = Znng_Cd) %>%
+  select(-Town)
+
+#Viz
+ggplot() + 
+  geom_sf(data = King_William_Zoning, aes(fill = Code), color = "black", linewidth = 0.05) 
+
+
+
+
+
 
 #For initial visualizing of Richmond
 ggplot() + 
   geom_sf(data = CentralCities_2020, fill = NA, color = "black", linewidth = 0.65) +
   geom_sf(data = CBSA_2020, color = "black", fill = "white", linewidth = 0.6) +
-  geom_sf(data = Amelia_Zoning, aes(fill = Code), col = "white") +
-  geom_sf(data = Colonial_Heights_Zoning, aes(fill = Code), col = NA) +
-  geom_sf(data = Chesterfield_Zoning, aes(fill = Code), col = "white") +
-  geom_sf(data = CoR_Zoning, aes(fill = Code), col = "white") +
-  geom_sf(data = Dinwiddie_Zoning, aes(fill = Code), col = "white") +
-  geom_sf(data = Goochland_Zoning, aes(fill = Code), col = "white") +
-  geom_sf(data = Hanover_Zoning, aes(fill = Code), col = "white") +
-  geom_sf(data = Henrico_Zoning, aes(fill = Code), col = "white") +
-  geom_sf(data = Hopewell_Zoning, aes(fill = Code), col = "white") +
-  geom_sf(data = KingQueen_Zoning, aes(fill = Code), col = "white") +
-  geom_sf(data = Powhattan_Zoning, aes(fill = Code), col = "white") + 
-  geom_sf(data = PrinceGeorge_Zoning, aes(fill = Code), col = "white") +
-  geom_sf(data = Sussex_Zoning, aes(fill = Code), col = "white") +
+  geom_sf(data = Amelia_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = Charles_City, aes(fill = Code), col = NA, linewidth = 0.1) +
+  geom_sf(data = Colonial_Heights_Zoning, aes(fill = Code), col = NA, linewidth = 0.1) +
+  geom_sf(data = Chesterfield_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = CoR_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = Dinwiddie_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = Goochland_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = Hanover_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = Henrico_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = Hopewell_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = KingQueen_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = King_William_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = NewKent_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = Powhattan_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) + 
+  geom_sf(data = PrinceGeorge_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = Sussex_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
   # geom_sf(data = Counties_2020[Counties_2020$NAME == "Chesterfield", ], 
   #         fill = NA, color = "black", linewidth = 0.20) + 
   theme_void() +
   theme(legend.spacing.y = unit(.1, "lines")) +
   geom_sf(data = Counties_2020, fill = NA, color = "black", linewidth = 0.65) 
+
+
+
+
+
+ 
 
 
