@@ -311,10 +311,29 @@ ggplot() +
   geom_sf(data = King_William_Zoning, aes(fill = Code), color = "black", linewidth = 0.05) 
 
 
+#----
+#Petersburg city
+Petersburg_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Petersburg/Petersburg_Parcels.shp")) %>%
+  mutate(County = "Petersburg",
+         Year_Created = NA,
+         Last_Updated = 2024) %>%
+  rename(Code = Zoning) %>%
+  select(Code, County, Year_Created, Last_Updated, geometry) 
+
+# Petersburg_Zoning <- st_simplify(Petersburg_Zoning, preserveTopology = TRUE)
+
+#Validate geometries without an end
+Petersburg_Zoning <- st_make_valid(Petersburg_Zoning)
+
+#Viz
+ggplot() + 
+  # geom_sf(data = Amelia_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = Petersburg_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) 
+
+#Export above and fill missing/invalid geometries
 
 
-
-
+#----
 #For initial visualizing of Richmond
 ggplot() + 
   geom_sf(data = CentralCities_2020, fill = NA, color = "black", linewidth = 0.65) +
@@ -332,19 +351,21 @@ ggplot() +
   geom_sf(data = KingQueen_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
   geom_sf(data = King_William_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
   geom_sf(data = NewKent_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
-  geom_sf(data = Powhattan_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) + 
+  geom_sf(data = Petersburg_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = Powhattan_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
   geom_sf(data = PrinceGeorge_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
   geom_sf(data = Sussex_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
-  # geom_sf(data = Counties_2020[Counties_2020$NAME == "Chesterfield", ], 
-  #         fill = NA, color = "black", linewidth = 0.20) + 
+  geom_sf(data = Counties_2020[Counties_2020$NAME == "Chesterfield", ],
+          fill = NA, color = "black", linewidth = 0.20) +
   theme_void() +
   theme(legend.spacing.y = unit(.1, "lines")) +
   geom_sf(data = Counties_2020, fill = NA, color = "black", linewidth = 0.65) 
 
-
-
-
-
- 
+# ggsave("RichMSA-Zone-All.png",
+#        path = "~/desktop",
+#        width = 25,
+#        height = 15,
+#        units = "in",
+#        dpi = 500)
 
 
