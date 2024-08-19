@@ -9,6 +9,7 @@ require(tidyverse)
 require(tidyverse)
 require(sf)
 library(tigris)
+library(readxl)
 
 options(tigris_use_cache = TRUE)
 
@@ -57,12 +58,26 @@ Counties_2020 <- counties(ST,
 
 #City of Richmond
 CoR_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmond City/ZoningDistricts.shp")) %>%
-  mutate(County = "Richmond",
+  mutate(County = "City of Richmond",
          Year_Adopted = substr(AdoptionDa, 1, 4),
          Year = Year_Adopted) %>%
-  rename(Code = Name) #%>%
-  #select(Code, County, Year, geometry)
-  
+  rename(Code = Name) %>%
+  select(Code, County, Year, geometry)
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+CoR_Zoning <- CoR_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code"))
+
+#Viz above
+ggplot() + 
+  # geom_sf(data = CentralCities_2020, fill = NA, color = "black", linewidth = 0.65) +
+  # geom_sf(data = CBSA_2020, color = "black", fill = "white", linewidth = 0.6) +
+  geom_sf(data = CoR_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0.1) 
+
+
 #----
 #Henrico
 Henrico_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Henrico/Zoning.shp")) %>%
@@ -313,17 +328,21 @@ ggplot() +
 
 #----
 #Petersburg city
-Petersburg_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Petersburg/Petersburg_Parcels.shp")) %>%
+Petersburg_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Petersburg/Petersburg_Zoning.shp")) %>%
   mutate(County = "Petersburg",
          Year_Created = NA,
          Last_Updated = 2024) %>%
-  rename(Code = Zoning) %>%
+  rename(Code = T_1l_Ex_23) %>%
   select(Code, County, Year_Created, Last_Updated, geometry) 
 
-# Petersburg_Zoning <- st_simplify(Petersburg_Zoning, preserveTopology = TRUE)
-
-#Validate geometries without an end
-Petersburg_Zoning <- st_make_valid(Petersburg_Zoning)
+# #Override unclosed rings
+# Sys.setenv(OGR_GEOMETRY_ACCEPT_UNCLOSED_RING = "NO")
+# 
+# #Simplify geometries
+# Petersburg_Zoning_simplified <- st_simplify(Petersburg_Zoning, preserveTopology = TRUE)
+# 
+# #Validate geometries without an end
+# Petersburg_Zoning <- st_make_valid(Petersburg_Zoning)
 
 #Viz
 ggplot() + 
@@ -331,6 +350,7 @@ ggplot() +
   geom_sf(data = Petersburg_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) 
 
 #Export above and fill missing/invalid geometries
+# st_write(Petersburg_Zoning, paste0(onedrivepath, "Zoning data/Richmond MSA/Petersburg/Petersburg_Untidy.shp"))
 
 
 #----
