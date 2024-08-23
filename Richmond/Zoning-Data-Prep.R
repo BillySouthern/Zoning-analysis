@@ -52,6 +52,26 @@ Counties_2020 <- counties(ST,
                           cb = F) %>%
   filter(lengths(st_within(., CBSA_2020)) > 0)
 
+#Load transitional geographies
+#2020
+Transitional_2020 <- read_sf(paste0(onedrivepath, "Mapping Richmond/Index/Index_2020/Richmond_Index_2020.shp")) %>%
+  rename(Suburban_Index = Sbrbn_I,
+         Urban_Index = Urbn_In,
+         Landscape_Four = Lndscp_Fr,
+         Landscape_Five = Lndscp_Fv,
+         Landscape_Six = Lndsc_S,
+         Landscape_All = Lndsc_A) %>%
+  select(GEOID, Landscape_Five)
+
+#Load places too
+Place_Tracts_2020 <- read.csv(file.path(onedrivepath, "Mapping Richmond/Places/2020/Place_Tracts_2020.csv")) %>%
+  select(-X) %>%
+  mutate(GEOID = as.character(GEOID))
+
+#Join two above
+Richmond_Geographies <- Transitional_2020 %>%
+  left_join(Place_Tracts_2020, by = "GEOID")
+
 
 #--------------------------------------------------------------------------------
   #Load zoning data
@@ -62,20 +82,34 @@ CoR_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmond Ci
          Year_Adopted = substr(AdoptionDa, 1, 4),
          Year = Year_Adopted) %>%
   rename(Code = Name) %>%
-  select(Code, County, Year, geometry)
+  select(Code, County, Year, geometry) 
 
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
 
 #Join descriptions with code
 CoR_Zoning <- CoR_Zoning %>%
-  left_join(RVA_Zoning_Descriptions, by= c("County", "Code"))
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry)
 
 #Viz above
 ggplot() + 
+  basemap_magick(CoR_Zoning, map_service = "carto", map_type = "dark")
   # geom_sf(data = CentralCities_2020, fill = NA, color = "black", linewidth = 0.65) +
   # geom_sf(data = CBSA_2020, color = "black", fill = "white", linewidth = 0.6) +
-  geom_sf(data = CoR_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0.1) 
+  # geom_sf(data = CoR_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  # geom_sf(data = CoR_Zoning, aes(fill = Maximum_Density_Allowed), col = "white", linewidth = 0.1) +
+  geom_sf(data = CoR_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0.1) +
+  basemap_gglayer(ext) +
+  
+    ggplot(data = CoR_Zoning) +
+    annotation_map_tile("cartodark",   zoomin = 0.5) +
+    geom_sf(aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0.1, alpha = 0.3) +
+    theme_minimal()
+  
+  library(prettymapr)
+  library(ggspatial)
+  library(sf)
 
 
 #----
@@ -83,8 +117,29 @@ ggplot() +
 Henrico_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Henrico/Zoning.shp")) %>%
   mutate(County = "Henrico",
          Year = 2022) %>%
-  rename(Code = ZONE_NAME) #%>%
-  #select(Code, County, Year, geometry)
+  rename(Code = ZONE_NAME) %>%
+  mutate(Code = str_remove(Code, "C$")) %>% #Remove conditional category
+  #select(Code, County, Year, geometry) %>%
+  mutate(Code = case_when( #One parcel in the process of rezoning from A to R-3
+   ZONE_LABEL == "REZ2019-00027" ~ "R-3",  # Update this line as needed
+   Code == "x" ~ "A-1",  #One zoning code set to x
+   TRUE ~ Code
+  ))
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Henrico_Zoning <- Henrico_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry)
+
+#To check which codes have missing labels
+Missing_Codes <- Henrico_Zoning %>%
+  filter(is.na(Name)) 
+
+table(Missing_Codes$Code)
+
 
 #----
 #Chesterfield
@@ -93,6 +148,23 @@ Chesterfield_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Ch
          Year = 2020) %>%
   rename(Code = Zoning) #%>%
 #select(Code, County, Year, geometry) %>%
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Chesterfield_Zoning <- Chesterfield_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry)
+
+#Viz above
+ggplot() + 
+  geom_sf(data = Chesterfield_Zoning, aes(fill = Maximum_Density_Allowed), col = "white", linewidth = 0.1) + 
+  geom_sf(data = CoR_Zoning, aes(fill = Maximum_Density_Allowed), col = "white", linewidth = 0.1) +
+  geom_sf(data = Henrico_Zoning, aes(fill = Maximum_Density_Allowed), col = "white", linewidth = 0.1) +
+  # geom_sf(data = Transitional_2020[Transitional_2020$Landscape_Five == "Unstable", ], fill = NA, col = "black", linewidth = 0.5) 
+  geom_sf(data = Richmond_Geographies[Richmond_Geographies$Place == "Place", ], fill = NA, col = "black", linewidth = 0.5) 
+
 
 #----
 #Amelia
@@ -105,11 +177,20 @@ Amelia_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Amelia/W
   rename(Code = Name) #%>%
 #select(Code, County, Year, geometry) %>%
 
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Amelia_Zoning <- Amelia_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry)
+
+
 #----
 #Dinwiddie County
 #Extract data from ArcGIS directory
-Dinwiddie_Zoning <- st_read(paste0("https://services.arcgis.com/pXJ1hE8HkwpsRwne/ArcGIS/rest/services/Dinwiddie_Operational_Layers_view/FeatureServer/19", 
-                                   "/query?where=1=1&outFields=*&f=json")) 
+# Dinwiddie_Zoning <- st_read(paste0("https://services.arcgis.com/pXJ1hE8HkwpsRwne/ArcGIS/rest/services/Dinwiddie_Operational_Layers_view/FeatureServer/19", 
+#                                    "/query?where=1=1&outFields=*&f=json")) 
 
 # # Save the data to a CSV file
 # write.csv(Dinwiddie_Zoning, paste0(onedrivepath, "Zoning data/Richmond MSA/Dinwiddie/Dinwiddie_zoning.csv"), row.names = FALSE)
@@ -119,9 +200,21 @@ Dinwiddie_Zoning <- st_read(paste0("https://services.arcgis.com/pXJ1hE8HkwpsRwne
 # 
 #Reload (to test file) and tody
 Dinwiddie_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Dinwiddie/Dinwiddie_zoning.shp")) %>%
-  mutate(County = "Dinwiddie") %>%
+  mutate(County = "Dinwiddie",
+         Year = 2023) %>%
   rename(Code = ZONING) #%>%
 #select(Code, County, Year, geometry) %>%
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Dinwiddie_Zoning <- Dinwiddie_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry)
+
+
+
 
 #----
 #Colonial Heights
@@ -142,8 +235,24 @@ Colonial_Heights_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MS
   mutate(County = "Colonial Heights",
          Year = 2019) %>%
   rename(Code = "ZONINGCODE") %>%
-  filter(!Code == "NA") #%>%
-#select(Code, County, Year, geometry) %>%
+  filter(!Code == "NA") %>%
+  mutate(Code = case_when( #One parcel in the process of rezoning from A to R-3
+    Code == "PUD\r\nPUD" ~ "PUD",  # Update this line as needed
+    Code == "RL\r\nRL\r\nRL" ~ "RL",  #One zoning code set to x
+    Code == "RL\r\nRL\r\nRL\r\nRL" ~ "RL",  # Update this line as needed
+    Code == "RL\r\nRL" ~ "RL",  #One zoning code set to x
+    Code == "R\r\nRL" ~ "RL",  # Update this line as needed
+    Code == "Rl" ~ "RL",  #One zoning code set to x
+    TRUE ~ Code
+  ))
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Colonial_Heights_Zoning <- Colonial_Heights_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry) 
 
 #----
 #Goochland County
@@ -173,28 +282,57 @@ Goochland_Zoning <- rbind(Goochland_Zoning, Goochland_Permits)
 
 #Reload (to test file) and tody
 Goochland_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Goochland/goochland_zoning.shp")) %>%
-  mutate(County = "Goochland") %>%
+  mutate(County = "Goochland",
+         Year = 2024) %>%
   rename(Code = Zoning) #%>%
 #select(Code, County, Year, geometry) %>%
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Goochland_Zoning <- Goochland_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry) 
 
 #----
 #Hanover
 Hanover_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Hanover/Zoning.shp")) %>%
   mutate(County = "Hanover",
-         Year_Created = 2019,
-         Last_Updated = 2024) %>%
+         Year = 2019) %>%
   rename(Code = CLASS) #%>%
 #select(Code, County, Year, geometry) %>%
 
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Hanover_Zoning <- Hanover_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry) %>%
+  filter(!Code == "NA") #One parcel with no data
 
 #----
 #Powhattan
 Powhattan_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Powhattan/Zoning.shp")) %>%
   mutate(County = "Powhattan",
-         Year_Created = NA,
-         Last_Updated = 2024) %>%
-  rename(Code = ZONING) #%>%
-#select(Code, County, Year, geometry)
+         Year = 2024) %>%
+  rename(Code = ZONING) %>%
+  mutate(Code = if_else(is.na(Code), as.character(row_number()), Code)) %>%
+  mutate(Code = case_when( #One parcel in the process of rezoning from A to R-3
+    Code == "2" ~ "R-R",  #One zoning code set to x
+    TRUE ~ Code
+  ))
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Powhattan_Zoning <- Powhattan_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry) %>%
+  filter(!Name == "NA") #One parcel with no data
+
 
 
 #----
@@ -213,10 +351,26 @@ Sussex_Zoning <- st_read(paste0("https://services3.arcgis.com/nJbIFHiSnaX0z0hS/A
 #Reload (to test file) and tody
 Sussex_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Sussex/Sussex_zoning.shp")) %>%
   mutate(County = "Sussex",
-         Year_Created = 2021,
-         Last_Updated = 2024) %>%
-  rename(Code = "zoning") #%>%
+         Year = 2024) %>%
+  rename(Code = "zoning") %>%
+  mutate(Code = case_when( #One parcel in the process of rezoning from A to R-3
+    Code == "AREA OF DISPUTE" ~ "A-1",  #One parcel in disupute and still A-1
+    TRUE ~ Code
+  )) #%>%
 #select(Code, County, Year, geometry) %>%
+
+#Match crs
+Sussex_Zoning <- st_set_crs(Sussex_Zoning, st_crs(Powhattan_Zoning))
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Sussex_Zoning <- Sussex_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry) %>%
+  filter(!Name == "NA") #One parcel with no data
+
 
 #----
 #Hopewell city
@@ -226,6 +380,45 @@ Hopewell_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Hopewe
          Last_Updated = 2024) %>%
   rename(Code = ZONE_ID) #%>%
 #select(Code, County, Year, geometry)
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Hopewell_Zoning <- Hopewell_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry) %>%
+  filter(!Name == "NA") #One parcel with no data
+
+
+
+
+
+
+
+
+#Viz above
+ggplot() + 
+  geom_sf(data = Sussex_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0) +
+  geom_sf(data = Powhattan_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0) +
+  geom_sf(data = Hanover_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0) +
+  geom_sf(data = Goochland_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0) +
+  geom_sf(data = Colonial_Heights_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0) +
+  geom_sf(data = Dinwiddie_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0) +
+  geom_sf(data = Amelia_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0) +
+  geom_sf(data = Chesterfield_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0) + 
+  geom_sf(data = CoR_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0) +
+  geom_sf(data = Henrico_Zoning, aes(fill = Zoning_Atlas_Definition), col = "white", linewidth = 0) +
+  # geom_sf(data = Transitional_2020[Transitional_2020$Landscape_Five == "Unstable", ], fill = NA, col = "black", linewidth = 0.5) 
+  geom_sf(data = Richmond_Geographies[Richmond_Geographies$Place == "Place", ], fill = NA, col = "black", linewidth = 0.5) 
+
+#To check which codes have missing labels
+Missing_Codes <- Sussex_Zoning %>%
+  filter(is.na(Name))
+
+table(Missing_Codes$Code)
+
+plot(Missing_Codes)
 
 #----
 #King and Queen County
@@ -387,5 +580,7 @@ ggplot() +
 #        height = 15,
 #        units = "in",
 #        dpi = 500)
+
+
 
 
