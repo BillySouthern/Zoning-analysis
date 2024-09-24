@@ -300,9 +300,9 @@ Powhattan_Zoning <- Powhattan_Zoning %>%
 #----
 #Sussex
 #Extract data from ArcGIS directory
-Sussex_Zoning <- st_read(paste0("https://services3.arcgis.com/nJbIFHiSnaX0z0hS/ArcGIS/rest/services/SussexParcels_Zoning/FeatureServer/1", 
-                                   "/query?where=1=1&outFields=*&f=json")) %>%   #Select variables to reduce export size
-  select(zoning, geometry)
+# Sussex_Zoning <- st_read(paste0("https://services3.arcgis.com/nJbIFHiSnaX0z0hS/ArcGIS/rest/services/SussexParcels_Zoning/FeatureServer/1", 
+#                                    "/query?where=1=1&outFields=*&f=json")) %>%   #Select variables to reduce export size
+#   select(zoning, geometry)
 
 # Save the data to a CSV file
 # write.csv(Sussex_Zoning, paste0(onedrivepath, "Zoning data/Richmond MSA/Sussex/Sussex_zoning.csv"), row.names = FALSE)
@@ -617,9 +617,9 @@ Richmond_Zoning <- rbind(Amelia_Zoning, CoR_Zoning, Charles_City_Zoning, Chester
                          Sussex_Zoning)
 
 #Export file
-st_write(Richmond_Zoning, "~/Desktop/Export/Richmond_Zoning.shp")
+# st_write(Richmond_Zoning, "~/Desktop/Export/Richmond_Zoning.shp")
 
-#At this point, I validate geographies in QGIS using a 0 buffer, then reintroduce into R and sum
+#At this point, I validate geographies in QGIS using a 0.00001 buffer, then reintroduce into R and sum
 
 #Reload
 Richmond_Zoning <- read_sf("~/Desktop/Export_2/Richmond_Zoning.shp") 
@@ -631,18 +631,21 @@ Richmond_Zoning <- Richmond_Zoning %>%
   ungroup() %>%
   rename(Hou_Den = Hsng_Ds,
          Max_Den = Mxm_D_A,
-         ZA_Def = Znn_A_D)
+         ZA_Def = Znn_A_D) %>%
+  st_set_crs(NAD83) %>%
+  st_transform(crs = st_crs(CoR_Zoning))
 
 #Export to shapefile
-#st_write(Richmond_Zoning, "~/Desktop/Export_3/Richmond_Zoning.shp") 
+st_write(Richmond_Zoning, "~/Desktop/Export_3/Richmond_Zoning.shp") 
 
 #Reload
-Richmond_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmond_Complete/Richmond_Zoning.shp"))
+Richmond_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmond_Complete/Richmond_Zoning.shp"))  
+
 
 #For initial visualizing of Richmond
 ggplot() + 
   # geom_sf(data = CentralCities_2020, fill = NA, color = "black", linewidth = 0.65) +
-  geom_sf(data = CBSA_2020, color = "black", fill = "white", linewidth = 0.6) +
+  # geom_sf(data = CBSA_2020, color = "black", fill = "white", linewidth = 0.6) +
   geom_sf(data = Richmond_Zoning, aes(fill = ZA_Def), col = "white", linewidth = 0) +
   theme_void() +
   theme(legend.spacing.y = unit(.1, "lines")) +
