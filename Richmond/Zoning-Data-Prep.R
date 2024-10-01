@@ -84,6 +84,9 @@ CoR_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmond Ci
   rename(Code = Name) %>%
   select(Code, County, Year, geometry) 
 
+#Export raw
+# st_write(CoR_Zoning, "~/Desktop/RVA Zoning/Raw data/Richmond_City.shp") 
+
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
 
@@ -107,6 +110,10 @@ Henrico_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Henrico
   )) %>%
   st_transform(st_crs(CoR_Zoning)) 
 
+# #Export raw
+# st_write(Henrico_Zoning, "~/Desktop/RVA Zoning/Raw data/Henrico_Zoning.shp") 
+
+
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
 
@@ -123,6 +130,10 @@ Chesterfield_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Ch
   rename(Code = Zoning) %>%
   st_transform(st_crs(CoR_Zoning)) 
 
+#Export raw
+# st_write(Chesterfield_Zoning, "~/Desktop/RVA Zoning/Raw data/Chesterfield_Zoning.shp") 
+
+
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
 
@@ -138,9 +149,13 @@ Amelia_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Amelia/W
   filter(st_geometry_type(geometry) != "POINT") %>%
   mutate(County = "Amelia",
          Year = 2020) %>%
-  select(-Description) %>%
+  # select(-Description) %>%
   rename(Code = Name) %>%
   st_transform(st_crs(CoR_Zoning)) 
+
+#Export raw
+# st_write(Amelia_Zoning, "~/Desktop/RVA Zoning/Raw data/Amelia_Zoning.shp")
+
 
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
@@ -168,6 +183,10 @@ Dinwiddie_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Dinwi
          Year = 2023) %>%
   rename(Code = ZONING) %>%
   st_transform(st_crs(CoR_Zoning)) 
+
+# #Export raw
+# st_write(Dinwiddie_Zoning, "~/Desktop/RVA Zoning/Raw data/Dinwiddie_Zoning.shp")
+
 
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
@@ -208,6 +227,10 @@ Colonial_Heights_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MS
     TRUE ~ Code
   ))%>%
   st_transform(st_crs(CoR_Zoning)) 
+
+#Export raw
+# st_write(Colonial_Heights_Zoning, "~/Desktop/RVA Zoning/Raw data/Colonial_Heights_Zoning.shp")
+
 
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
@@ -250,6 +273,10 @@ Goochland_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Gooch
   rename(Code = Zoning) %>%
   st_transform(st_crs(CoR_Zoning)) 
 
+# #Export raw
+# st_write(Goochland_Zoning, "~/Desktop/RVA Zoning/Raw data/Goochland_Zoning.shp")
+
+
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
 
@@ -265,6 +292,9 @@ Hanover_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Hanover
          Year = 2019) %>%
   rename(Code = CLASS) %>%
   st_transform(st_crs(CoR_Zoning)) 
+
+# #Export raw
+# st_write(Hanover_Zoning, "~/Desktop/RVA Zoning/Raw data/Hanover_Zoning.shp")
 
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
@@ -287,6 +317,9 @@ Powhattan_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Powha
     TRUE ~ Code
   )) %>%
   st_transform(st_crs(CoR_Zoning)) 
+
+#Export raw
+# st_write(Powhattan_Zoning, "~/Desktop/RVA Zoning/Raw data/Powhattan_Zoning.shp")
 
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
@@ -323,6 +356,9 @@ Sussex_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Sussex/S
 #Match crs
 Sussex_Zoning <- st_set_crs(Sussex_Zoning, st_crs(CoR_Zoning))
 
+# #Export raw
+# st_write(Sussex_Zoning, "~/Desktop/RVA Zoning/Raw data/Sussex_Zoning.shp")
+
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
 
@@ -338,9 +374,12 @@ Sussex_Zoning <- Sussex_Zoning %>%
 Hopewell_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Hopewell/Hopewell Zoning.gdb")) %>%
   mutate(County = "Hopewell",
          Year = 2024) %>%
-  rename(Code = ZONE_LBL,
-         geometry = Shape) %>%
+  # rename(Code = ZONE_LBL,
+  #        geometry = Shape) %>%
   st_transform(st_crs(CoR_Zoning)) 
+
+# Export raw
+# st_write(Hopewell_Zoning, "~/Desktop/RVA Zoning/Raw data/Hopewell_Zoning.shp")
 
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
@@ -358,6 +397,9 @@ KingQueen_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/King 
   rename(Code = ZONING) %>%
   st_transform(st_crs(CoR_Zoning)) 
 
+# Export raw
+# st_write(KingQueen_Zoning, "~/Desktop/RVA Zoning/Raw data/KingQueen_Zoning.shp")
+
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
 
@@ -373,10 +415,13 @@ PrinceGeorge_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Pr
          Year = 2024) %>%
   rename(Code = ZoningClas) %>%
   mutate(Code = case_when( #One parcel in the process of rezoning from A to R-3
-    is.na(Code) ~ "I-2",  #One parcel in disupute and still A-1
+    is.na(Code) ~ "I-2",  #One parcel in dispute and still A-1
     TRUE ~ Code
   ))  %>%
   st_transform(st_crs(CoR_Zoning)) 
+
+# Export raw
+# st_write(PrinceGeorge_Zoning, "~/Desktop/RVA Zoning/Raw data/PrinceGeorge_Zoning.shp")
 
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
@@ -397,6 +442,9 @@ Charles_City_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Ch
          Year = 2020)  %>%
   st_transform(st_crs(CoR_Zoning)) 
 
+# #Export raw
+# st_write(Charles_City_Zoning, "~/Desktop/RVA Zoning/Raw data/Charles_City_Zoning.shp")
+
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
 
@@ -416,6 +464,9 @@ NewKent_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/New Ken
     TRUE ~ Code
   ))  %>%
   st_transform(st_crs(CoR_Zoning)) 
+
+# #Export raw
+# st_write(Charles_City_Zoning, "~/Desktop/RVA Zoning/Raw data/Charles_City_Zoning.shp")
 
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
@@ -485,6 +536,9 @@ King_William_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Ki
     TRUE ~ Code
   ))  %>%
   st_transform(st_crs(CoR_Zoning)) 
+
+# #Export raw
+# st_write(King_William_Zoning, "~/Desktop/RVA Zoning/Raw data/King_William_Zoning.shp")
 
 #Load zoning description
 RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
@@ -623,7 +677,22 @@ Richmond_Zoning <- rbind(Amelia_Zoning, CoR_Zoning, Charles_City_Zoning, Chester
 
 #Reload
 Richmond_Zoning <- read_sf("~/Desktop/Export_2/Richmond_Zoning.shp") 
+  # rename(Hou_Den = Hsng_Ds,
+  #        Max_Den = Mxm_D_A,
+  #        ZA_Def = Znn_A_D) %>%
+  # st_transform(crs = st_crs(CoR_Zoning)) %>%
+  # mutate(Max_Den = case_when(
+  #   Max_Den == "Single-family detached, duplex" ~ "Duplex",
+  #   Max_Den == "Three two-family attached dwellings" ~ "Two-family attached dwellings",
+  #   Max_Den == "Townhouses" ~ "Townhouse",
+  #   Max_Den == "None" ~ "No housing allowed",
+  #   T ~ Max_Den))  
   
+# # #Export raw
+# st_write(Richmond_Zoning, "~/Desktop/RVA Zoning/Richmond_Zoning_with_codes.shp")
+
+
+
 #Sum Richmond by various columns
 Richmond_Zoning <- Richmond_Zoning %>%
   group_by(County, Name, Nature, Hsng_Ds, Mxm_D_A, Znn_A_D) %>%
@@ -639,7 +708,16 @@ Richmond_Zoning <- Richmond_Zoning %>%
 st_write(Richmond_Zoning, "~/Desktop/Export_3/Richmond_Zoning.shp") 
 
 #Reload
-Richmond_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmond_Complete/Richmond_Zoning.shp"))  
+Richmond_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmond_Complete/Richmond_Zoning.shp")) %>%
+  mutate(Max_Den = case_when(
+    Max_Den == "Single-family detached, duplex" ~ "Duplex",
+    Max_Den == "Three two-family attached dwellings" ~ "Two-family attached dwellings",
+    Max_Den == "Townhouses" ~ "Townhouse",
+    Max_Den == "None" ~ "No housing allowed",
+    T ~ Max_Den))
+
+# # #Export raw
+st_write(Richmond_Zoning, "~/Desktop/RVA Zoning/Richmond_Zoning_without_codes.shp")
 
 
 #For initial visualizing of Richmond
