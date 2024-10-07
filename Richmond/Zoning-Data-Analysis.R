@@ -70,18 +70,17 @@ Counties_2020 <- counties(ST,
   filter(lengths(st_within(., CBSA_2020)) > 0)
 
 
-#For initial visualizing of Richmond
-ggplot() + 
-  # geom_sf(data = CentralCities_2020, fill = NA, color = "black", linewidth = 0.65) +
-  # geom_sf(data = CBSA_2020, color = "black", fill = "white", linewidth = 0.6) +
-  geom_sf(data = Richmond_Zoning[Richmond_Zoning$County == "Henrico", ], aes(fill = ZA_Def), col = "white", linewidth = 0) +
-  theme_void() +
-  theme(legend.spacing.y = unit(.1, "lines")) +
-  geom_sf(data = Counties_2020, fill = NA, color = "black", linewidth = 0.6) +
-  geom_sf(data = Transitional_2020[Transitional_2020$Landscape_Five == "Unstable", ], fill = NA, col = "black", linewidth = 0.2) 
+# #For initial visualizing of Richmond
+# ggplot() + 
+#   # geom_sf(data = CentralCities_2020, fill = NA, color = "black", linewidth = 0.65) +
+#   # geom_sf(data = CBSA_2020, color = "black", fill = "white", linewidth = 0.6) +
+#   geom_sf(data = Richmond_Zoning[Richmond_Zoning$County == "Henrico", ], aes(fill = ZA_Def), col = "white", linewidth = 0) +
+#   theme_void() +
+#   theme(legend.spacing.y = unit(.1, "lines")) +
+#   geom_sf(data = Counties_2020, fill = NA, color = "black", linewidth = 0.6) +
+#   geom_sf(data = Transitional_2020[Transitional_2020$Landscape_Five == "Unstable", ], fill = NA, col = "black", linewidth = 0.2) 
 
 #Create interactive map
-
 #Group by each column
 Zoning_Atlas <- Richmond_Zoning %>%
   group_by(County, ZA_Def) %>%
@@ -708,80 +707,4 @@ intersection <- intersection %>%
 
 
 #----------------------------------------------------------------------------------------------
-#Core logic work
-#Base R approach
-# data <- read.delim("/Users/billy/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/External data/pennsylvania_state_university_mortgage_basic2_300000230479868_20210409_103424_VA.txt", 
-#                    sep = "|", header = TRUE, stringsAsFactors = FALSE)
 
-# readr approach (recommended for large files)
-# library(readr)
-# data <- read_delim("/Users/billy/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/External data/pennsylvania_state_university_mortgage_basic2_300000230479868_20210409_103424_VA.txt",
-#                    delim = "|", col_names = TRUE)
-
-
-# Using data.table for large files
-onedrivepath <- "~/OneDrive - The Pennsylvania State University/"
-
-# Use fread with the correct file path construction
-VA_mortgages <- fread(paste0(normalizePath(onedrivepath), "Mapping Richmond/Parcel-Buildings/pennsylvania_state_university_mortgage_basic2_300000230479868_20210409_103424_VA.txt"), 
-                      sep = "|", header = TRUE) #%>%
-  #slice(1:25)
-
-
-# Use fread with the correct file path construction
-VA_property <- fread(paste0(normalizePath(onedrivepath), "Mapping Richmond/Parcel-Buildings/pennsylvania_state_university_property_basic2_300000230479867_20210409_102905_VA.txt"), 
-                      sep = "|", header = TRUE) 
-
-#Filter hanover and henrico
-Hanover_Henrico_Builds <- VA_property[str_detect(`SITUS COUNTY`, regex("HANOVER|HENRICO", ignore_case = TRUE))]
-
-#Export
-# saveRDS(Hanover_Henrico_Builds, "Hanover_Henrico_Buildings.rds")
-
-#Filter relevant data
-# Remove columns where all values are NA
-Hanover_Henrico_Builds <- Hanover_Henrico_Builds[, lapply(.SD, function(col) if (all(is.na(col))) NULL else col)]
-
-#identify columns
-Geography <- c("FIPS CODE", "ORIGINAL APN", "SITUS COUNTY", "SITUS CITY", "COUNTY USE DESCRIPTION", "STATE USE DESCRIPTION", 
-               "PARCEL LEVEL LONGITUDE", "PARCEL LEVEL LATITUDE")
-
-Building <- c("ZONING CODE", "ZONING CODE DESCRIPTION", "BUILDING STYLE CODE", "MULTI OR SPLIT PARCEL CODE", 
-              "OWNER OCCUPANCY CODE", "ACRES", "UNIVERSAL BUILDING SQUARE FEET", "BUILDING SQUARE FEET", 
-              "TOTAL SQUARE FOOTAGE ALL BUILDINGS", "LAND SQUARE FOOTAGE", "YEAR BUILT", "EFFECTIVE YEAR BUILT")
-
-Value <- c("SALE DATE", "SALE RECORDING DATE","TRANSACTION BATCH DATE", "SALE AMOUNT",  
-           "TAX AMOUNT", "TAX YEAR", "ASSESSED YEAR", 
-           "TOTAL VALUE CALCULATED","LAND VALUE CALCULATED", "IMPROVEMENT VALUE CALCULATED", 
-           "ASSESSED TOTAL VALUE", "ASSESSED LAND VALUE", "ASSESSED IMPROVEMENT VALUE", 
-           "MARKET TOTAL VALUE", "MARKET LAND VALUE", "MARKET IMPROVEMENT VALUE")
-
-#To create a tidy Hanover dataframe
-Hanover_CL_Tidy <- Hanover_Henrico_Builds %>%
-  filter(`SITUS COUNTY` == "HANOVER") %>%
-  select(Geography, Building, Value) %>%
-  rename(PIN = `ORIGINAL APN`) 
-
-#Load in County's own data
-Hanover_Buildings_County <- read_excel(paste0(onedrivepath, "/Mapping Richmond/Parcel-Buildings/Hanover_Buildings.xls")) %>%
-  rename(PIN = `GPIN #`)
-
-#Merge CoreLogic and County data
-Hanover <- Hanover_Buildings_County %>%
-  left_join(Hanover_CL_Tidy, by = "PIN")
-
-
-
-# WILL NEED TO TIDY COLUMNS TO MATCH HENRICO
-  MERGE ZONING COLUMNS
-
-
-
-
-#Median value by zoning code
-# Zoning_Value <- Hanover_Henrico_Tidy %>%
-#   group_by(`SITUS COUNTY`, `ZONING CODE`) %>%
-#   summarise(median_value = median(`TOTAL VALUE CALCULATED`, na.rm = TRUE))
-
-
-Check hanover county for list of houses too
