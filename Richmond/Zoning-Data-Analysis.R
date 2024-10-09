@@ -84,11 +84,15 @@ Counties_2020 <- counties(ST,
 #Group by each column
 Zoning_Atlas <- Richmond_Zoning %>%
   group_by(County, ZA_Def) %>%
+  rename("Zoning Atlas Definition" = ZA_Def) %>%
   summarise(geometry = st_union(geometry)) %>%  # Dissolve by union
   ungroup() 
 
+#Export
+# st_write(Zoning_Atlas, "~/Desktop/Exp_Builder_Data/ZA/Zoning_Atlas_Definition.shp") 
+
 Max_Hou_Den <- Richmond_Zoning %>%
-  group_by(County, Max_Den) %>%
+  group_by(County, Max_Den, Hou_Den) %>%
   summarise(geometry = st_union(geometry)) %>%  # Dissolve by union
   ungroup() %>%
   mutate(Max_Den = case_when(
@@ -98,7 +102,12 @@ Max_Hou_Den <- Richmond_Zoning %>%
     Max_Den == "None" ~ "No housing allowed",
     T ~ Max_Den)) %>%
   mutate(Max_Den = str_remove(Max_Den, "dwellings")) %>%
-  mutate(Max_Den = str_trim(Max_Den))
+  mutate(Max_Den = str_trim(Max_Den)) 
+  # rename("Maximum Housing Density" = Max_Den,
+  #        "Housing Permitted" = Hou_Den)
+
+#Export
+# st_write(Max_Hou_Den, "~/Desktop/Exp_Builder_Data/Max_Hou/Maximum_Housing_Density.shp")
 
 Nature_Zoning <- Richmond_Zoning %>%
   # mutate(Nature = case_when(
@@ -145,15 +154,17 @@ Nature_Zoning <- Richmond_Zoning %>%
   Nature == "No zoning" ~ "No zoning found",
   T ~ Nature)) %>%
   mutate(Nature = str_trim(Nature)) %>%
-  group_by(County, Nature, Nature_Specific) %>%
+  group_by(County, Nature, "Nature_Specific") %>%
   summarise(geometry = st_union(geometry)) %>%  # Dissolve by union
   ungroup() 
  
+#Export
+# st_write(Nature_Zoning, "~/Desktop/Exp_Builder_Data/Nature/Zoning_Nature.shp")
 
 
 
 #Convert objects above to appropriate crs
-Richmond_Zoning <- st_transform(Richmond_Zoning, 4326)
+# Richmond_Zoning <- st_transform(Richmond_Zoning, 4326)
 Zoning_Atlas <- st_transform(Zoning_Atlas, 4326)
 Nature_Zoning <- st_transform(Nature_Zoning, 4326)
 Max_Hou_Den <- st_transform(Max_Hou_Den, 4326)
