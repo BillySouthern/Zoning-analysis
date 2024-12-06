@@ -22,6 +22,11 @@ library(ggpubr)
 library(grid)
 library(ggridges)
 library(forcats)  
+library(tmap)
+library(tigris)
+library(tidycensus)
+
+options(tigris_use_cache = TRUE)
 
 
 # options(tigris_use_cache = TRUE)
@@ -611,12 +616,12 @@ annotate_figure(combined_plot,
                                       gp = gpar(fontsize = 14)))
 
 
-# ggsave("Parcel_Density_Plot.jpg",
-#        path = "~/desktop",
-#        width = 10,
-#        height = 12,
-#        units = "in",
-#        dpi = 500)
+ggsave("Parcel_Density_Plot.jpg",
+       path = "~/desktop",
+       width = 10,
+       height = 12,
+       units = "in",
+       dpi = 500)
 
 #Line chart tracking prices
 Henrico_Med_Test <- Henrico %>%
@@ -628,42 +633,42 @@ Henrico_Med_Test <- Henrico %>%
   summarise(Median_Unit_Value = median(`SALE AMOUNT`, na.rm = TRUE)) %>%
   ungroup() %>%
   mutate(Lot_Size_Description = case_when(
-    `ZONING CODE` %in% c("A1", "R0", "R1", "R1A") ~ "A1, R0, and R1",
-    `ZONING CODE` %in% c("R2", "R2A", "R2AC", "R2C") ~ "R2",
-    `ZONING CODE` %in% c("R3", "R3A", "R3AC", "R3C") ~ "R3",
-    `ZONING CODE` %in% c("R4", "R4A", "R4AC") ~ "R4",
-    `ZONING CODE` %in% c("R5", "R5A", "R5AC", "R5C") ~ "R5",
-    `ZONING CODE` %in% c("R6", "R6C", "RTH", "RTHC") ~ "R6 and Townhouses",
+    `ZONING CODE` %in% c("A-1", "R-0", "R1", "R-1A") ~ "A-1, R-0, and R-1",
+    `ZONING CODE` %in% c("R-2", "R-2A", "R-2AC", "R-2C") ~ "R-2",
+    `ZONING CODE` %in% c("R-3", "R-3A", "R-3AC", "R-3C") ~ "R-3",
+    `ZONING CODE` %in% c("R-4", "R-4A", "R-4AC") ~ "R-4",
+    `ZONING CODE` %in% c("R-5", "R-5A", "R-5AC", "R-5C") ~ "R-5",
+    `ZONING CODE` %in% c("R-6", "R-6C", "RTH", "RTHC") ~ "R-6 and Townhouses",
     TRUE ~ NA_character_  # Fallback for any other values not captured
   )) %>%
   mutate(Color = case_when(
-    `ZONING CODE` %in% c("R1A", "R2A", "R3A", "R4A", "R5A") ~ "A subcodes",
-    `ZONING CODE` %in% c("R2AC", "R3AC", "R4AC", "R5AC", "R5A") ~ "AC subcodes",
-    `ZONING CODE` %in% c("R2C", "R3C", "R5C", "R6C") ~ "C subcodes",
+    `ZONING CODE` %in% c("R-1A", "R-2A", "R-3A", "R-4A", "R-5A") ~ "A subcodes",
+    `ZONING CODE` %in% c("R-2AC", "R-3AC", "R-4AC", "R-5AC", "R-5A") ~ "AC subcodes",
+    `ZONING CODE` %in% c("R-2C", "R-3C", "R-5C", "R-6C") ~ "C subcodes",
     `ZONING CODE` %in% c("RTH", "RTHC") ~ "Townhouses",
-    `ZONING CODE` %in% c("R1", "R2", "R3", "R4", "R5", "R6") ~ "Standard R code",
-    `ZONING CODE` %in% c("A1") ~ "A1",
-    `ZONING CODE` %in% c("R0") ~ "R0",
+    `ZONING CODE` %in% c("R-1", "R-2", "R-3", "R-4", "R-5", "R-6") ~ "Standard R code",
+    `ZONING CODE` %in% c("A-1") ~ "A-1",
+    `ZONING CODE` %in% c("R-0") ~ "R-0",
     TRUE ~ NA_character_  # Fallback for any other values not captured
   ))  %>%
   mutate(Linetype = case_when(
-    `ZONING CODE` %in% c("R1A", "R2A", "R3A", "R4A", "R5A", 
-                         "R2AC", "R3AC", "R4AC", "R5AC", "R5A", 
-                         "R2C", "R3C", "R5C", "R6C") ~ "A, C, and AC",
+    `ZONING CODE` %in% c("R-1A", "R-2A", "R-3A", "R-4A", "R-5A", 
+                         "R-2AC", "R-3AC", "R-4AC", "R-5AC", "R-5A", 
+                         "R-2C", "R-3C", "R-5C", "R6C") ~ "A, C, and AC",
     `ZONING CODE` %in% c("RTH", "RTHC") ~ "Townhouses",
-    `ZONING CODE` %in% c("R1", "R2", "R3", "R4", "R5", "R6") ~ "Standard R code",
-    `ZONING CODE` %in% c("A1") ~ "A1",
-    `ZONING CODE` %in% c("R0") ~ "R0",
+    `ZONING CODE` %in% c("R-1", "R-2", "R-3", "R-4", "R-5", "R-6") ~ "Standard R code",
+    `ZONING CODE` %in% c("A-1") ~ "A-1",
+    `ZONING CODE` %in% c("R-0") ~ "R-0",
     TRUE ~ NA_character_  # Fallback for any other values not captured
   )) %>%
   mutate(Lot_Size = case_when(
-    `ZONING CODE` %in% c("R5", "R6", "RTH", "RTHC") ~ "Multifamily units",
-    `ZONING CODE` %in% c("R2", "R3", "R4") ~ "Minimum lot area of 8,000 feet²",
-    `ZONING CODE` %in% c("R0", "A1", "R1") ~ "Minimum lot area of 25,000 feet²",
+    `ZONING CODE` %in% c("R-5", "R-6", "RTH", "RTHC") ~ "Mulitfamily and single-family zoning",
+    `ZONING CODE` %in% c("R-2", "R-3", "R-4") ~ "SF housing, minimum lot 8,000 feet²",
+    `ZONING CODE` %in% c("R-0", "A-1", "R-1") ~ "SF housing, minimum lot 25,000 feet²",
     TRUE ~ NA_character_  # Fallback for any other values not captured
   )) 
   
-Med_Test <- Med_Test %>% 
+Henrico_Med_Test <- Henrico_Med_Test %>% 
   mutate(Median_Unit_Value_Inf = adjust_for_inflation(Median_Unit_Value, 
                                                   `SALE YEAR`, "US", to_date = 2020)) %>%
   filter(`Median_Unit_Value_Inf` <= 1500000)   # Exclude sale amounts greater than 5,000,000
@@ -754,41 +759,42 @@ ggplot(Henrico_Med_Test %>%
 
 #median sale value of parcel by zoning code in that year
 #Henrico
-ggplot(Med_Test %>%
+ggplot(Henrico_Med_Test %>%
          mutate(`ZONING CODE` = fct_relevel(`ZONING CODE`, 
-                                            "R5", "R6", "RTH",  # First group
-                                            "R2", "R3", "R4",   # Second group
-                                            "R0", "R1", "A1"    # Last group
+                                            "R-0", "R-1", "A-1",    # Last group
+                                            "R-2", "R-3", "R-4",   # Second group
+                                            "RTH", "R-5", "R-6"  # First group
          )) %>%
-         filter(`ZONING CODE` %in% c("A1", "R0", "R1", "R2", "R3", "R4", "R5", "R6", "RTH")), 
+         filter(`ZONING CODE` %in% c("A-1", "R-0", "R-1", "R-2", "R-3", "R-4", "R-5", "R-6", "RTH")), 
        aes(x = `SALE YEAR`, y = Median_Unit_Value_Inf, color = `ZONING CODE`, 
            group = `ZONING CODE`, linetype = `ZONING CODE`)) +
-  facet_grid(fct_relevel(Lot_Size, "Multifamily units", 
-                         "Minimum lot area of 8,000 feet²", "Minimum lot area of 25,000 feet²",
+  facet_grid(fct_relevel(Lot_Size, "SF housing, minimum lot 25,000 feet²", 
+                                   "SF housing, minimum lot 8,000 feet²",
+                          "Mulitfamily and single-family zoning",
                          ) ~ .,
              # scales = "free_y", space = "free",
              switch = "y"
   ) +
   geom_vline(xintercept = 1933, color = "darkgrey", linetype = "solid", size = 0.75) +
-  geom_text(data = Med_Test %>% filter(Lot_Size == "Multifamily units"),  # Filtering inside the layer
+  geom_text(data = Henrico_Med_Test %>% filter(Lot_Size == "Mulitfamily and single-family zoning"),  # Filtering inside the layer
     aes(x = 1932, y = 300000, angle = 90, label = "First zoning ordinance of 1933"), 
     hjust = 0, color = "black", size = 3.5
   ) +  
   geom_vline(xintercept = 1942, color = "darkgrey", linetype = "solid", size = 0.75) +
-  geom_text(data = Med_Test %>% filter(Lot_Size == "Multifamily units"),  # Filtering inside the layer
+  geom_text(data = Henrico_Med_Test %>% filter(Lot_Size == "Mulitfamily and single-family zoning"),  # Filtering inside the layer
             aes(x = 1941, y = 500000, angle = 90, label = "1942 ordinance"), 
             hjust = 0, color = "black", size = 3.5) +
   
   geom_vline(xintercept = 1945, color = "darkgrey", linetype = "solid", size = 0.75) +
-  geom_text(data = Med_Test %>% filter(Lot_Size == "Multifamily units"),  # Filtering inside the layer
+  geom_text(data = Henrico_Med_Test %>% filter(Lot_Size == "Mulitfamily and single-family zoning"),  # Filtering inside the layer
             aes(x = 1944, y = 500000, angle = 90, label = "1945 ordinance"), 
             hjust = 0, color = "black", size = 3.5) +
   geom_vline(xintercept = 1960, color = "darkgrey", linetype = "solid", size = 0.75) +
-  geom_text(data = Med_Test %>% filter(Lot_Size == "Multifamily units"),  # Filtering inside the layer
+  geom_text(data = Henrico_Med_Test %>% filter(Lot_Size == "Mulitfamily and single-family zoning"),  # Filtering inside the layer
             aes(x = 1959, y = 500000, angle = 90, label = "1960 ordinance"), 
             hjust = 0, color = "black", size = 3.5) +
   geom_vline(xintercept = 2022, color = "darkgrey", linetype = "solid", size = 0.75) +
-  geom_text(data = Med_Test %>% filter(Lot_Size == "Multifamily units"),  # Filtering inside the layer
+  geom_text(data = Henrico_Med_Test %>% filter(Lot_Size == "Mulitfamily and single-family zoning"),  # Filtering inside the layer
             aes(x = 2021, y = 500000, angle = 90, label = "2022 zoning ordinance"), 
             hjust = 0, color = "black", size = 3.5) +
   geom_line(col = "white", size = 1.75) +
@@ -800,24 +806,24 @@ ggplot(Med_Test %>%
                      position = "right") +
   scale_x_continuous(breaks = c(1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020)) +
   coord_cartesian(xlim=c(1952, 2020)) +
-  scale_color_manual(values = c("A1" = "black",
-                                "R0" = "#1b9e77",
-                                "R2" = "#7570b3",
-                                "R3" = "#e7298a",
-                                "R4" = "#66a61e",
-                                "R5" = "#e6ab02",
-                                "R6" = "red",
+  scale_color_manual(values = c("A-1" = "black",
+                                "R-0" = "#1b9e77",
+                                "R-2" = "#7570b3",
+                                "R-3" = "#e7298a",
+                                "R-4" = "#66a61e",
+                                "R-5" = "#e6ab02",
+                                "R-6" = "red",
                                 "RTH" = "#a6761d",
-                                "R1" = "#d95f02"),
+                                "R-1" = "#d95f02"),
                      name = "Parcel's current\nzoning code") +
-  scale_linetype_manual(values = c("A1" = "dashed",
-                                   "R0" = "solid",
-                                   "R1" = "solid",
-                                   "R2" = "solid",
-                                   "R3" = "solid",
-                                   "R4" = "solid",
-                                   "R5" = "solid",
-                                   "R6" = "solid",
+  scale_linetype_manual(values = c("A-1" = "dashed",
+                                   "R-0" = "solid",
+                                   "R-1" = "solid",
+                                   "R-2" = "solid",
+                                   "R-3" = "solid",
+                                   "R-4" = "solid",
+                                   "R-5" = "solid",
+                                   "R-6" = "solid",
                                    "RTH" = "dashed"),
                         name = "Parcel's current\nzoning code") +
   labs(title = "Henrico County",
@@ -843,10 +849,9 @@ ggplot(Med_Test %>%
         legend.text = element_text(size = 14),
         legend.key.size = unit(2, 'lines'),           # Increase the size of the legend key
         legend.spacing = unit(4.0, 'cm')        
-        
   ) 
 
-# ggsave("Haenrico_R_Parcel_Sales_Facet.jpg",
+# ggsave("Henrico_R_Parcel_Sales_Facet.jpg",
 #        path = "~/desktop",
 #        width = 12,
 #        height = 10,
@@ -1039,3 +1044,94 @@ ggplot(Hanover_Med_Test %>%
 #        height = 10,
 #        units = "in",
 #        dpi = 500)
+
+#---------------------------------------------------------------------------------------
+#Mapping mobile homes in Henrico
+
+#Load and tidy
+Henrico <- read_rds(paste0(onedrivepath, "Mapping Richmond/Parcel-Buildings/Henrico/Henrico_Buildings_small.rds")) %>%
+  filter(if_any(c(CoreLogic_Description, County_Description), ~ 
+                  str_detect(.x, regex("Manufacture|Mobile", ignore_case = TRUE)))) %>%
+  st_as_sf(coords = c("PARCEL LEVEL LONGITUDE", "PARCEL LEVEL LATITUDE"), crs = 4326) %>%
+  mutate(CoreLogic_Description = str_replace(str_to_lower(CoreLogic_Description), "^.", ~str_to_upper(.)))
+
+
+
+
+
+
+#Download Counties and filter to within CBSA
+Counties_2020 <- counties(ST,
+                        year = YR4,
+                        cb = F) %>%
+  filter(NAME == "Henrico")
+
+#Create lines
+Counties_2020 <- st_boundary(Counties_2020)
+  
+#2020 Median HH income by urban/suburban
+Med_inc_2020 <- get_acs(
+  geography = "block group", 
+  variables = "B19013_001E", 
+  state = "VA", 
+  year = YR4, 
+  output = "wide", 
+  geometry = TRUE) %>%
+  rename("Income_2020" = B19013_001E,
+          "IncomeMOE_2020" = B19013_001M) %>%
+  filter(str_detect(NAME, regex("Henrico County", ignore_case = TRUE))) 
+  
+data <- load_variables("2020", "acs5")
+  
+# Plot using tmap
+tmap_mode("plot") # Interactive mode or "view"
+# tm_basemap("OpenStreetMap") +
+Income_Zoning <- tm_shape(Med_inc_2020) +
+  tm_fill("Income_2020", 
+          title = "Median household income", 
+          style = "fixed", 
+          breaks = c(0, 50000, 100000, 150000, 200000, Inf),
+          labels = c("$0 - $50,000", 
+                     "$50,001 - $100,000", 
+                     "$100,001 - $150,000", 
+                     "$150,001 - $200,000", 
+                     "$200,001 or more"),
+          palette = "Purples", 
+          alpha = 1,
+          legend.show = TRUE,
+          colorNA = "grey",        # Color for NA values
+          textNA = "No population"  # Label for NA values
+  ) +  
+  tm_shape(Counties_2020) +
+  tm_lines(col="black", lwd = 0.5, scale=  2, legend.lwd.show = FALSE) +
+  tm_shape(Henrico) +
+  tm_dots(col = "CoreLogic_Description", size = 0.25, palette = c("#d95f02", "#1b9e77"), title = "") +
+  tm_layout(main.title = "",
+            main.title.size = 1.4,
+            main.title.position = "left",
+            main.title.fontface = "bold",
+            frame = F,
+            legend.position = c(0.1, 0.05), 
+            # legend.position = "left",
+            legend.title.size = 1,
+            legend.title.fontface = "bold",
+            legend.outside = F,
+            legend.show = T,
+            panel.show = F,
+            panel.label.bg.color = "transparent",
+            panel.label.color = "#737373",
+            #panel.labels = "Year",
+            panel.label.fontface = "bold",
+            #inner.margins = c(0.02, 0.15, 0.2, 0.1)
+  ) 
+
+
+#To save
+tmap_save(
+  tm = Income_Zoning,
+  filename = "~/desktop/Emilys_Map.png",
+  height = 8,
+  width = 8,
+  dpi = 500
+)
+

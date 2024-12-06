@@ -110,26 +110,26 @@ Max_Hou_Den <- Richmond_Zoning %>%
 # st_write(Max_Hou_Den, "~/Desktop/Exp_Builder_Data/Max_Hou/Maximum_Housing_Density.shp")
 
 Nature_Zoning <- Richmond_Zoning %>%
-  # mutate(Nature = case_when(
-  #Commercial
-  # Nature == "Commercial (with restricted industrial)" ~ "Commercial (with restricted industrial/residential)",
-  # Nature == "Commercial (with restricted residential and industrial)" ~ "Mixed use",
-  # Nature == "Commercial (with restricted residential)" ~ "Commercial (with restricted industrial/residential)",
-  # Nature == "Commercial and industrial" ~ "Mixed use",
-  # Nature == "Commercial and industrial (with restricted residential)" ~ "Mixed use",
-  # #Industrial
-  # Nature == "Industrial (and restricted commercial)" ~ "Industrial (with restricted commercial/residential)",
-  # Nature == "Industrial (and restricted residential and commercial)" ~ "Industrial (with restricted commercial/residential)",
-  # Nature == "Industrial (with limited commercial)" ~ "Industrial (with restricted commercial/residential)",
-  # #Residential
-  # Nature == "Residential (with limited commercial)" ~ "Residential (with restricted commercial/industrial)",
-  # Nature == "Residential and commercial" ~ "Mixed use",
-  # Nature == "Residential and industrial" ~ "Mixed use",
-  # Nature == "Residential, commercial, and industrial" ~ "Mixed use",
-  # #No zoning
-  # Nature == "No zoning" ~ "No zoning found",
-  # T ~ Nature)) %>%
-  mutate(Nature_Specific = Nature,
+  mutate(Nature = case_when(
+  # Commercial
+  Nature == "Commercial (with restricted industrial)" ~ "Commercial (with restricted industrial/residential)",
+  Nature == "Commercial (with restricted residential and industrial)" ~ "Mixed use",
+  Nature == "Commercial (with restricted residential)" ~ "Commercial (with restricted industrial/residential)",
+  Nature == "Commercial and industrial" ~ "Mixed use",
+  Nature == "Commercial and industrial (with restricted residential)" ~ "Mixed use",
+  #Industrial
+  Nature == "Industrial (and restricted commercial)" ~ "Industrial (with restricted commercial/residential)",
+  Nature == "Industrial (and restricted residential and commercial)" ~ "Industrial (with restricted commercial/residential)",
+  Nature == "Industrial (with limited commercial)" ~ "Industrial (with restricted commercial/residential)",
+  #Residential
+  Nature == "Residential (with limited commercial)" ~ "Residential (with restricted commercial/industrial)",
+  Nature == "Residential and commercial" ~ "Mixed use",
+  Nature == "Residential and industrial" ~ "Mixed use",
+  Nature == "Residential, commercial, and industrial" ~ "Mixed use",
+  #No zoning
+  Nature == "No zoning" ~ "No zoning found",
+  T ~ Nature)) %>%
+  mutate("Nature Specific" = Nature,
          Nature = case_when(
   #Commercial
   Nature == "Commercial (with restricted industrial)" ~ "Commercial",
@@ -143,7 +143,7 @@ Nature_Zoning <- Richmond_Zoning %>%
   Nature == "Industrial (and restricted commercial)" ~ "Industrial",
   Nature == "Industrial (and restricted residential and commercial)" ~ "Industrial",
   Nature == "Industrial (with limited commercial)" ~ "Industrial",
-  Nature == "Industrial (with restricted commercial/residential) " ~ "Industrial",
+  Nature == "Industrial (with restricted commercial/residential)" ~ "Industrial",
   #Residential
   Nature == "Residential (with limited commercial)" ~ "Residential",
   Nature == "Residential (with restricted commercial/industrial)" ~ "Residential",
@@ -154,12 +154,12 @@ Nature_Zoning <- Richmond_Zoning %>%
   Nature == "No zoning" ~ "No zoning found",
   T ~ Nature)) %>%
   mutate(Nature = str_trim(Nature)) %>%
-  group_by(County, Nature, "Nature_Specific") %>%
+  group_by(County, Nature, `Nature Specific`) %>%
   summarise(geometry = st_union(geometry)) %>%  # Dissolve by union
   ungroup() 
  
 #Export
-# st_write(Nature_Zoning, "~/Desktop/Exp_Builder_Data/Nature/Zoning_Nature.shp")
+st_write(Nature_Zoning, "~/Desktop/Exp_Builder_Data/Nature/Zoning_Nature.shp")
 
 
 
@@ -182,83 +182,83 @@ RVA_Zoning <- leaflet() %>%
                    group = "map labels") %>%
   addMiniMap(tiles = "CartoDB.Positron") %>%
   #ZONING ATLAS DEFINITION
-  addPolygons(
-    data = Zoning_Atlas,
-    fillColor = ~colorFactor(
-      palette = c("#80b1d3", "#fb8072", "#ffffb3"),
-      levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
-      domain = unique(Zoning_Atlas$ZA_Def)
-    )(ZA_Def),
-    color = ~colorFactor(
-      palette = c("#80b1d3", "#fb8072", "#ffffb3"),
-      levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
-      domain = unique(Zoning_Atlas$ZA_Def)
-    )(ZA_Def),
-    fillOpacity = 0.5,
-    weight = 0,
-    highlightOptions = highlightOptions(
-      color = "white",
-      fillOpacity = 1,
-      weight = 1
-    ),
-    group = "Zoning Atlas Definition",
-    label = ~Zoning_Atlas$ZA_Def,
-    options = pathOptions(pane = "polygons")  # Added pane option
-  ) %>%
-  addLegend(
-    position = "bottomleft",
-    pal = colorFactor(
-      palette = c("#80b1d3", "#fb8072", "#ffffb3"),
-      levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
-      domain = Zoning_Atlas$ZA_Def   # Adjusting domain directly
-    ),
-    values = Zoning_Atlas$ZA_Def,   # Removed the formula notation (~)
-    title = "Zoning Atlas Definition"
-  ) %>%
-
-  #MAXIMUM DENSITY
-  addPolygons(
-      data = Max_Hou_Den,
-      fillColor = ~colorFactor(
-        palette = c("#a6cee3", "darkblue", "#33a02c", "#b2df8a",
-                    "grey", "#ff7f00", "#fdbf6f", "#e31a1c", "#fb9a99"),
-        levels = c("Apartments", "Multifamily", "Townhouse", "Duplex",
-                   "No housing allowed", "Single-family attached", "Single-family detached", "Two-family attached",
-                   "Two-family detached"),
-        domain = unique(Max_Hou_Den$Max_Den)
-      )(Max_Den),
-      color = ~colorFactor(
-        palette = c("#a6cee3", "darkblue", "#33a02c", "#b2df8a",
-                    "grey", "#ff7f00", "#fdbf6f", "#e31a1c", "#fb9a99"),
-        levels = c("Apartments", "Multifamily", "Townhouse", "Duplex",
-                   "No housing allowed", "Single-family attached", "Single-family detached", "Two-family attached",
-                   "Two-family detached"),
-        domain = unique(Max_Hou_Den$Max_Den)
-      )(Max_Den),
-    fillOpacity = 0.5,
-    weight = 1,       # Border width
-    highlightOptions = highlightOptions(
-      color = "white",
-      fillOpacity = 1,
-      weight = 2
-    ),
-    group = "Maximum Housing Density",
-    label = ~Max_Hou_Den$Max_Den,
-    options = pathOptions(pane = "polygons")  # Added pane option
-  ) %>%
-    addLegend(
-    position = "bottomleft",
-    pal = colorFactor(
-      palette = c("#a6cee3", "darkblue", "#33a02c", "#b2df8a",
-                  "white", "#ff7f00", "#fdbf6f", "#e31a1c", "#fb9a99"),
-      levels = c("Apartments", "Multifamily", "Townhouse", "Duplex",
-                 "No housing allowed", "Single-family attached", "Single-family detached", "Two-family attached",
-                 "Two-family detached"),
-      domain = Max_Hou_Den$Max_Den   # Adjusting domain directly
-    ),
-    values = Max_Hou_Den$Max_Den,   # Removed the formula notation (~)
-    title = "Maximum Housing Density"
-  ) %>%
+  # addPolygons(
+  #   data = Zoning_Atlas,
+  #   fillColor = ~colorFactor(
+  #     palette = c("#80b1d3", "#fb8072", "#ffffb3"),
+  #     levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
+  #     domain = unique(Zoning_Atlas$ZA_Def)
+  #   )(ZA_Def),
+  #   color = ~colorFactor(
+  #     palette = c("#80b1d3", "#fb8072", "#ffffb3"),
+  #     levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
+  #     domain = unique(Zoning_Atlas$ZA_Def)
+  #   )(ZA_Def),
+  #   fillOpacity = 0.5,
+  #   weight = 0,
+  #   highlightOptions = highlightOptions(
+  #     color = "white",
+  #     fillOpacity = 1,
+  #     weight = 1
+  #   ),
+  #   group = "Zoning Atlas Definition",
+  #   label = ~Zoning_Atlas$ZA_Def,
+  #   options = pathOptions(pane = "polygons")  # Added pane option
+  # ) %>%
+  # addLegend(
+  #   position = "bottomleft",
+  #   pal = colorFactor(
+  #     palette = c("#80b1d3", "#fb8072", "#ffffb3"),
+  #     levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
+  #     domain = Zoning_Atlas$ZA_Def   # Adjusting domain directly
+  #   ),
+  #   values = Zoning_Atlas$ZA_Def,   # Removed the formula notation (~)
+  #   title = "Zoning Atlas Definition"
+  # ) %>%
+  # 
+  # #MAXIMUM DENSITY
+  # addPolygons(
+  #     data = Max_Hou_Den,
+  #     fillColor = ~colorFactor(
+  #       palette = c("#a6cee3", "darkblue", "#33a02c", "#b2df8a",
+  #                   "grey", "#ff7f00", "#fdbf6f", "#e31a1c", "#fb9a99"),
+  #       levels = c("Apartments", "Multifamily", "Townhouse", "Duplex",
+  #                  "No housing allowed", "Single-family attached", "Single-family detached", "Two-family attached",
+  #                  "Two-family detached"),
+  #       domain = unique(Max_Hou_Den$Max_Den)
+  #     )(Max_Den),
+  #     color = ~colorFactor(
+  #       palette = c("#a6cee3", "darkblue", "#33a02c", "#b2df8a",
+  #                   "grey", "#ff7f00", "#fdbf6f", "#e31a1c", "#fb9a99"),
+  #       levels = c("Apartments", "Multifamily", "Townhouse", "Duplex",
+  #                  "No housing allowed", "Single-family attached", "Single-family detached", "Two-family attached",
+  #                  "Two-family detached"),
+  #       domain = unique(Max_Hou_Den$Max_Den)
+  #     )(Max_Den),
+  #   fillOpacity = 0.5,
+  #   weight = 1,       # Border width
+  #   highlightOptions = highlightOptions(
+  #     color = "white",
+  #     fillOpacity = 1,
+  #     weight = 2
+  #   ),
+  #   group = "Maximum Housing Density",
+  #   label = ~Max_Hou_Den$Max_Den,
+  #   options = pathOptions(pane = "polygons")  # Added pane option
+  # ) %>%
+  #   addLegend(
+  #   position = "bottomleft",
+  #   pal = colorFactor(
+  #     palette = c("#a6cee3", "darkblue", "#33a02c", "#b2df8a",
+  #                 "white", "#ff7f00", "#fdbf6f", "#e31a1c", "#fb9a99"),
+  #     levels = c("Apartments", "Multifamily", "Townhouse", "Duplex",
+  #                "No housing allowed", "Single-family attached", "Single-family detached", "Two-family attached",
+  #                "Two-family detached"),
+  #     domain = Max_Hou_Den$Max_Den   # Adjusting domain directly
+  #   ),
+  #   values = Max_Hou_Den$Max_Den,   # Removed the formula notation (~)
+  #   title = "Maximum Housing Density"
+  # ) %>%
   
   # #Nature
   addPolygons(
@@ -639,7 +639,8 @@ Richmond_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmo
     Max_Den == "Three two-family attached dwellings" ~ "Two-family attached dwellings",
     Max_Den == "Townhouses" ~ "Townhouse",
     Max_Den == "None" ~ "No housing allowed",
-    T ~ Max_Den)) 
+    T ~ Max_Den)) %>%
+  filter(!Max_Den == "No housing allowed")
 
 
 #Calc each polygon area
@@ -649,7 +650,7 @@ Richmond_Zoning <- Richmond_Zoning %>%
 #Area by group
 Max_Den_area <- Richmond_Zoning %>%
   group_by(Max_Den) %>%
-  summarize(Max_Den_Area = sum(GEOID_Area, na.rm = TRUE), .groups = "drop")
+  summarize(Max_Den_Area = sum(GEOID_Area, na.rm = TRUE), .groups = "drop") 
 
 # Calculate the overall total area
 Richmond_Area <- sum(Richmond_Zoning$GEOID_Area, na.rm = TRUE)
@@ -668,7 +669,12 @@ Richmond_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmo
     Max_Den == "Three two-family attached dwellings" ~ "Two-family attached dwellings",
     Max_Den == "Townhouses" ~ "Townhouse",
     Max_Den == "None" ~ "No housing allowed",
-    T ~ Max_Den))  
+    T ~ Max_Den))  %>%
+  filter(!Max_Den == "No housing allowed")
+
+#Calc each polygon area
+# Richmond_Zoning <- Richmond_Zoning %>%
+#   mutate(GEOID_Area = st_area(geometry)) 
 
 #Load transitional units
 Richmond_2020 <- read_sf(paste0(onedrivepath, "Mapping Richmond/Index/Index_2020/Richmond_Index_2020.shp")) %>%
@@ -713,9 +719,91 @@ Transitional_Area <- sum(Richmond_2020_fixed$Unstable_Area, na.rm = TRUE)
 
 # Calculate the percentage of each Max_Den value
 intersection <- intersection %>%
-  mutate(Percentage = (Max_Den_Area / Transitional_Area) * 100)
+  mutate(Percentage = (Max_Den_Area / Transitional_Area) * 100) %>%
+  # Calculate the sum of remaining percentages
+  mutate(Adjusted_Percentage = (Percentage / sum(Percentage)) * 100)
+
+#CONCENTRATED AREA ZONING
+#Calculate percent of concentrated areas by zoning
+
+#Load full dataset
+Richmond_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Richmond_Complete/Richmond_Zoning.shp")) %>%
+  # filter(County == "City of Richmond") %>%
+  # select(County, Max_Den, ZA_Def, geometry) %>%
+  mutate(Max_Den = case_when(
+    Max_Den == "Single-family detached, duplex" ~ "Duplex",
+    Max_Den == "Three two-family attached dwellings" ~ "Two-family attached dwellings",
+    Max_Den == "Townhouses" ~ "Townhouse",
+    Max_Den == "None" ~ "No housing allowed",
+    T ~ Max_Den)) 
+
+#Calc each polygon area
+Richmond_Zoning <- Richmond_Zoning %>%
+  mutate(GEOID_Area = st_area(geometry)) 
+
+#Area by group
+Max_Den_area <- Richmond_Zoning %>%
+  group_by(Max_Den) %>%
+  summarize(Max_Den_Area = sum(GEOID_Area, na.rm = TRUE), .groups = "drop") 
+
+# Calculate the overall total area
+Richmond_Area <- sum(Richmond_Zoning$GEOID_Area, na.rm = TRUE)
+
+# Calculate the percentage of each Max_Den value
+Max_Den_area <- Max_Den_area %>%
+  mutate(Percentage = (Max_Den_Area / Richmond_Area) * 100)
+
+#Load concentrated tracts
+Income_LISA_all <- readRDS(file.path(onedrivepath, "Mapping Richmond/Binned Income Data/LISA/LISA_Income_RVA.rds")) %>%
+  filter(Year == 2020) %>%
+  mutate(Concentrations = case_when(
+    Pval_i >= 0.05 ~ "Not significant",
+    Med_Income_Adj > 26200 & Med_Income_Adj <= 125000 & Local_M_i < 0 ~ "Not significant",  # Middle income
+    Med_Income_Adj > 26200 & Med_Income_Adj <= 125000 & Local_M_i > 0 ~ "Middle income clustered",  # Middle income
+    Med_Income_Adj >= 125000 & Local_M_i < 0 ~ "High-none", #High income, not concentrated
+    Med_Income_Adj >= 125000 & Local_M_i > 0 ~ "High-high", #High income, highly concentrated
+    Med_Income_Adj <= 26200 & Local_M_i > 0 ~ "Low-high", #Low income, highly concentrated
+    Med_Income_Adj <= 26200 & Local_M_i < 0 ~ "Low-none" #Low income, not concentrated
+  ))
+
+#Match projections
+Richmond_2020 <- st_transform(Income_LISA_all, crs = st_crs(Richmond_Zoning))
+
+#Sum area and group sum
+Richmond_Zoning_fixed <- Richmond_Zoning %>%
+  mutate(geometry = st_make_valid(geometry)) %>% #Might not be needed if buffering - check this
+  mutate(Zone_Area = st_area(geometry)) %>%
+  group_by(Max_Den) %>%
+  summarize(Max_Den_Area = sum(Zone_Area, na.rm = TRUE), .groups = "drop")
+
+# Filter transitional units then create intersection
+intersection <- Richmond_2020 %>%
+  filter(Concentrations == "Middle income clustered") %>%
+  st_intersection(Richmond_Zoning_fixed, Richmond_2020_fixed) %>%
+  mutate(Area_Intersect = st_area(geometry)) %>%
+  group_by(Max_Den) %>%
+  summarize(Max_Den_Area = sum(Area_Intersect, na.rm = TRUE), .groups = "drop")
 
 
+# Calculate the area of the original Richmond_Zoning polygons
+Richmond_2020_fixed <- Richmond_2020 %>%
+  filter(Concentrations == "Middle income clustered") %>%
+  mutate(Unstable_Area = st_area(geometry))
+
+# Calculate the overall total area
+Transitional_Area <- sum(Richmond_2020_fixed$Unstable_Area, na.rm = TRUE)
+
+# Calculate the percentage of each Max_Den value
+intersection <- intersection %>%
+  mutate(Percentage = (Max_Den_Area / Transitional_Area) * 100) %>%
+  # Calculate the sum of remaining percentages
+  mutate(Adjusted_Percentage = (Percentage / sum(Percentage)) * 100) %>%
+  select(Max_Den, Percentage)
 
 #----------------------------------------------------------------------------------------------
+#Map zoning codes across counties
+  #then facet with border
+
+
+
 
