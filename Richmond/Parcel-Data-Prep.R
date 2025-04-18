@@ -2,7 +2,7 @@
 #Goal: data tidying of parcel data
 
 #Analysis includes
-  #tidying parcel leve data of hanover and henrico co
+  #tidying parcel level data of hanover and henrico co
 
 #Libraries
 require(tidyverse)
@@ -25,6 +25,8 @@ library(forcats)
 library(tmap)
 library(tigris)
 library(tidycensus)
+library(patchwork)
+
 
 options(tigris_use_cache = TRUE)
 
@@ -362,7 +364,55 @@ Hanover <- read_rds(paste0(onedrivepath, "Mapping Richmond/Parcel-Buildings/Hano
     `ZONING CODE` %in% c("A1", "AR1", "AR2", "AR6", "R1", "R2", "R3", "R4", "R5", "R6", "RO1", "RR1") ~ 
       str_replace(`ZONING CODE`, "(A|AR|R)([0-9])", "\\1-\\2"),
     TRUE ~ `ZONING CODE`
-  ))
+  ))%>%
+  filter(!is.na(`PARCEL LEVEL LATITUDE`)) %>%
+  st_as_sf(coords = c("PARCEL LEVEL LONGITUDE", "PARCEL LEVEL LATITUDE"), crs = 4326) 
+
+#Load in concentrated census tracts
+Income_LISA_all <- readRDS(file.path(onedrivepath, "Mapping Richmond/Binned Income Data/LISA/LISA_Income_RVA.rds")) %>%
+  mutate(lisa_cluster = case_when(
+    Pval_i >= 0.05 ~ "Not significant",
+    scaled_estimate > 0 & Local_M_i > 0 ~ "High-high", #High income, high-income neighbors
+    scaled_estimate > 0 & Local_M_i < 0 ~ "High-low", #High income, low-income neighbors
+    scaled_estimate < 0 & Local_M_i > 0 ~ "Low-low", #Low income, low-income neighbors
+    scaled_estimate < 0 & Local_M_i < 0 ~ "Low-high" #Low income, high-income neighbors
+  )) %>%
+  mutate(Tract_type = case_when(
+    Med_Income_Adj >= 125000 ~ "Affluent tract",
+    Med_Income_Adj <= 26200 ~ "Poor tract",
+  )) %>%
+  mutate(Concentrations = case_when(
+    Pval_i >= 0.05 ~ "Not significant",
+    Med_Income_Adj > 26200 & Med_Income_Adj <= 125000 & Local_M_i < 0 ~ "Not significant",  # Middle income
+    Med_Income_Adj > 26200 & Med_Income_Adj <= 125000 & Local_M_i > 0 ~ "Middle income clustered",  # Middle income
+    Med_Income_Adj >= 125000 & Local_M_i < 0 ~ "High-none", #High income, not concentrated
+    Med_Income_Adj >= 125000 & Local_M_i > 0 ~ "High-high", #High income, highly concentrated
+    Med_Income_Adj <= 26200 & Local_M_i > 0 ~ "Low-high", #Low income, highly concentrated
+    Med_Income_Adj <= 26200 & Local_M_i < 0 ~ "Low-none" #Low income, not concentrated
+  )) %>%
+  filter(Year == 2020) %>%
+  mutate(Facet = if_else(Concentrations == "High-high",
+                         "Concentrated affluence",
+                         "Non-concentrated affluence")) %>%
+  select(GEOID, Landscape_Five, Med_Income_Adj, Facet, geometry)
+
+
+#Align coord
+# Transform tract data to same CRS as parcels if needed
+Income_LISA_all <- st_transform(Income_LISA_all, crs = st_crs(Hanover))
+
+#Merge parcel and conc aff
+Hanover <- st_join(Hanover, Income_LISA_all[, c("Facet")])   
+
+#Padding missing facets
+zoning_levels <- c("A-1", "R-0", "R-1", "R-2", "R-3", "R-4", "R-5", "R-6", "RTH")
+facet_levels <- c("Concentrated affluence", "Non-concentrated affluence")
+
+Hanover <- Hanover %>%
+  filter(`ZONING CODE` %in% c("RC", "AR-2", "AR-6", "AR-1", "A-1",
+                              "RS", "R-2", "R-3", "R-1",
+                              "RM", "R-4", "R-5")) %>%
+  complete(`ZONING CODE`, Facet)
 
 #Plot Hanover
 Hanover_Boxplot <- ggplot(Hanover, aes(x = factor(`ZONING CODE`, 
@@ -456,7 +506,47 @@ Henrico <- read_rds(paste0(onedrivepath, "Mapping Richmond/Parcel-Buildings/Henr
                          "R6C", "RTH", "RTHC", "R4AC", "RMP") ~ 
       str_replace(`ZONING CODE`, "(A|AR|R)([0-9])", "\\1-\\2"),
     TRUE ~ `ZONING CODE`
-  )) 
+  )) %>%
+  filter(!is.na(`PARCEL LEVEL LATITUDE`)) %>%
+  st_as_sf(coords = c("PARCEL LEVEL LONGITUDE", "PARCEL LEVEL LATITUDE"), crs = 4326) 
+
+#Load in concentrated census tracts
+Income_LISA_all <- readRDS(file.path(onedrivepath, "Mapping Richmond/Binned Income Data/LISA/LISA_Income_RVA.rds")) %>%
+  mutate(lisa_cluster = case_when(
+    Pval_i >= 0.05 ~ "Not significant",
+    scaled_estimate > 0 & Local_M_i > 0 ~ "High-high", #High income, high-income neighbors
+    scaled_estimate > 0 & Local_M_i < 0 ~ "High-low", #High income, low-income neighbors
+    scaled_estimate < 0 & Local_M_i > 0 ~ "Low-low", #Low income, low-income neighbors
+    scaled_estimate < 0 & Local_M_i < 0 ~ "Low-high" #Low income, high-income neighbors
+  )) %>%
+  mutate(Tract_type = case_when(
+    Med_Income_Adj >= 125000 ~ "Affluent tract",
+    Med_Income_Adj <= 26200 ~ "Poor tract",
+  )) %>%
+  mutate(Concentrations = case_when(
+    Pval_i >= 0.05 ~ "Not significant",
+    Med_Income_Adj > 26200 & Med_Income_Adj <= 125000 & Local_M_i < 0 ~ "Not significant",  # Middle income
+    Med_Income_Adj > 26200 & Med_Income_Adj <= 125000 & Local_M_i > 0 ~ "Middle income clustered",  # Middle income
+    Med_Income_Adj >= 125000 & Local_M_i < 0 ~ "High-none", #High income, not concentrated
+    Med_Income_Adj >= 125000 & Local_M_i > 0 ~ "High-high", #High income, highly concentrated
+    Med_Income_Adj <= 26200 & Local_M_i > 0 ~ "Low-high", #Low income, highly concentrated
+    Med_Income_Adj <= 26200 & Local_M_i < 0 ~ "Low-none" #Low income, not concentrated
+  )) %>%
+  filter(Year == 2020) %>%
+  mutate(Facet = if_else(Concentrations == "High-high",
+                                           "Concentrated affluence",
+                                           "Non-concentrated affluence")) %>%
+  select(GEOID, Landscape_Five, Med_Income_Adj, Facet, geometry)
+
+
+#Align coord
+# Transform tract data to same CRS as parcels if needed
+Income_LISA_all <- st_transform(Income_LISA_all, crs = st_crs(Henrico))
+
+#Merge parcel and conc aff
+Henrico <- st_join(Henrico, Income_LISA_all[, c("Facet")])  
+
+
 
 #Plot Hanover
 Henrico_Boxplot <- ggplot(Henrico, aes(x = factor(`ZONING CODE`, 
@@ -518,18 +608,27 @@ annotate_figure(combined_plot,
 
 #Geom density mapping
 
-Hanover_Density <- ggplot(data = Hanover, 
-       aes(x = Unit_Value, y = factor(`ZONING CODE`, 
-                                          levels = rev(c("A-1", "AR-6", "RC", "RS", "RM",
-                                                         "AR-1", "AR-2", "R-1", "R-2", 
-                                                         "R-3", "R-4", "R-5", "R-6", "R-O1", "RR-1"))))) +
+Hanover_Density <- ggplot(Hanover 
+                          %>%
+                            filter((`ZONING CODE` %in% c("RC", "A-1", "AR-1",  # First group
+                                                         "RS", "R-2", "R-3", "R-1",     # Second group
+                                                         "RM", "R-4", "R-5"))), 
+                          aes(x = Unit_Value, y = Facet)) +
+                                      # factor(`ZONING CODE`, 
+                                      #     levels = rev(c("A-1", "AR-6", "RC", "RS", "RM",
+                                      #                    "AR-1", "AR-2", "R-1", "R-2", 
+                                      #                    "R-3", "R-4", "R-5", "R-6", "R-O1", "RR-1"))))) +
   geom_density_ridges(quantile_lines = TRUE, quantiles = 2,
-                      scale = 0.99,
+                      scale = 1.1,
                       rel_min_height = 0.005, 
-                      fill = "#fdb462", col = "black") + 
-  facet_grid(fct_relevel(Code_Age, "Active", "Repealed") ~ .,
+                      aes(fill = Facet), col = "black") + 
+  facet_grid(fct_relevel(`ZONING CODE`) ~ .,
              scales = "free_y", space = "free",
-             switch = "y") +
+             switch = "y"
+  ) +
+  # facet_grid(fct_relevel(Code_Age, "Active", "Repealed") ~ .,
+  #            scales = "free_y", space = "free",
+  #            switch = "y") +
   theme_minimal(base_size = 14) + 
   scale_x_continuous(labels = label_dollar(),
                      breaks = c(0, 250000, 500000, 750000, 1000000, 1250000, 
@@ -537,16 +636,20 @@ Hanover_Density <- ggplot(data = Hanover,
                                 3000000, 3500000, 4000000, 4500000, 5000000)) +
   coord_cartesian(xlim=c(00000,2000000)) +
   theme_minimal() +
+  scale_fill_manual(values = c("Concentrated affluence" = "#7f3b08",
+                               "Non-concentrated affluence" = "grey"),
+                    name = NULL, guide = "none") +
   labs(
-    title = "Hanover County",
+    subtitle = "Hanover County",
     y = NULL,
     x = NULL
   ) +
-  theme(plot.subtitle = element_text(hjust = 0.5, size = 13, face = "bold"),
+  theme(plot.subtitle = element_text(hjust = 0.5, size = 14, face = "bold"),
         strip.placement = "outside",
         strip.text.y = element_markdown(size = 12, face = "bold"), 
         axis.text.x = element_text(size = 11, angle = 45, hjust = 0.75, vjust = 0.825),
-        axis.text.y = element_markdown(size = 12),
+        # axis.text.y = element_markdown(size = 12),
+        axis.text.y = element_blank(),
         plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
         legend.position = "right",
         axis.title.x = element_blank(),
@@ -559,21 +662,30 @@ Hanover_Density <- ggplot(data = Hanover,
   ) 
 
 
-Henrico_Density <- ggplot(data = Henrico, 
-       aes(x = Unit_Value, y = factor(`ZONING CODE`, 
-                                      levels = rev(c("A-1", "R-0", "R-1", "R-1A", "R-2", "R-2A", "R-2AC", 
-                                                     "R-2C", "R-3", "R-3A", "R-3AC", "R-3C", "R-4", "R-4A", "R-4AC", 
-                                                     "R-5", "R-5A", "R-5AC", "R-5C", "R-6", "R-6C",
-                                                     "RMP", "R-O", "RPN", "RTH", "RTHC"))))) +
+Henrico_Density <- ggplot(Henrico %>%
+                            filter((`ZONING CODE` %in% c("A-1", "R-0", "R-1", "R-2", "R-3", "R-4", "R-5", "R-6", "RTH"))), 
+       aes(x = Unit_Value, y = Facet)) +
+           # y = factor(`ZONING CODE`, 
+           #                            levels = rev(c("A-1", "R-0", "R-1", "R-1A", "R-2", "R-2A", "R-2AC", 
+           #                                           "R-2C", "R-3", "R-3A", "R-3AC", "R-3C", "R-4", "R-4A", "R-4AC", 
+           #                                           "R-5", "R-5A", "R-5AC", "R-5C", "R-6", "R-6C",
+           #                                           "RMP", "R-O", "RPN", "RTH", "RTHC"))))) +
   geom_density_ridges(quantile_lines = TRUE, quantiles = 2,
-                      scale = 0.99,
+                      scale = 1.1,
                       rel_min_height = 0.005, 
-                      fill = "#80b1d3", col = "black") + 
-  facet_grid(fct_relevel(Code_Age, "Single-family exclusive", "Single family and multifamily") ~ .,
+                      aes(fill = Facet), col = "black") + 
+  facet_grid(fct_relevel(`ZONING CODE`) ~ .,
              scales = "free_y", space = "free",
              # switch = "y"
              ) +
+  # facet_grid(fct_relevel(Code_Age, "Single-family exclusive", "Single family and multifamily") ~ .,
+  #            scales = "free_y", space = "free",
+  #            # switch = "y"
+  #            ) +
   theme_minimal(base_size = 14) + 
+  scale_fill_manual(values = c("Concentrated affluence" = "#7f3b08",
+                               "Non-concentrated affluence" = "grey"),
+                    name = NULL, guide = "none") +
   scale_x_continuous(labels = label_dollar(),
                      breaks = c(0, 250000, 500000, 750000, 1000000, 1250000, 
                                 1500000, 1750000, 2000000, 2500000, 
@@ -581,15 +693,16 @@ Henrico_Density <- ggplot(data = Henrico,
   coord_cartesian(xlim=c(00000,2000000)) +
   theme_minimal() +
   labs(
-    title = "Henrico County",
+    subtitle = "Henrico County",
     y = NULL,
     x = NULL
   ) +
-  theme(plot.subtitle = element_text(hjust = 0.5, size = 13, face = "bold"),
+  theme(plot.subtitle = element_text(hjust = 0.5, size = 14, face = "bold"),
         strip.placement = "outside",
         strip.text.y = element_markdown(size = 12, face = "bold"), 
         axis.text.x = element_text(size = 11, angle = 45, hjust = 0.75, vjust = 0.825),
-        axis.text.y = element_markdown(size = 12),
+        axis.text.y = element_blank(),
+        # axis.text.y = element_markdown(size = 12),
         plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
         legend.position = "right",
         axis.title.x = element_blank(),
@@ -602,21 +715,25 @@ Henrico_Density <- ggplot(data = Henrico,
   ) 
 
 #Plot together
-combined_plot <- ggarrange(Hanover_Density, Henrico_Density, 
-                           # heights = c(0.5, 1),
-                           widths = c(0.5, 0.5),
-                           ncol = 2, 
-                           align = "v",
-                           common.legend = TRUE, legend = "right")
+combined_plot <- ggarrange(
+  Hanover_Density, Henrico_Density, 
+  widths = c(0.5, 0.5),
+  ncol = 2, 
+  align = "v",
+  common.legend = TRUE, legend = "right"
+)
 
-# Add a common Y-axis label using annotate_figure
-annotate_figure(combined_plot,
-                bottom = grid::textGrob(expression("Parcel unit value"), 
-                                      rot = 0, vjust = 1, 
-                                      gp = gpar(fontsize = 14)))
+# Add title with color formatting
+final_plot <- combined_plot + 
+  plot_annotation(
+    title = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
+    theme = theme(
+      plot.title = element_markdown(size = 20, face = "bold", hjust = 0.5)
+    )
+  )
 
 
-ggsave("Parcel_Density_Plot.jpg",
+ggsave("Conc_Aff_Parcel_Plot.jpg",
        path = "~/desktop",
        width = 10,
        height = 12,
@@ -628,8 +745,20 @@ Henrico_Med_Test <- Henrico %>%
   mutate(`SALE YEAR` = as.numeric(substr(`SALE DATE`, 1, 4))) %>%
   filter(`SALE AMOUNT` <= 2000000) %>%   
   filter(!`ZONING CODE` %in% c("RMH", "RMP")) %>%
+  mutate(Zoning_Protection = case_when(
+    `ZONING CODE` %in% c("R-5", "R-5A", "R-5AC", "R-5C", "R-6", "R-6C", "RTH", "RTHC", "A-1") ~ "Not protected",
+    `ZONING CODE` %in% c("R-0", "R-1", "R-2", "R-3", "R-4",
+                                "R-1A", "R-2A", "R-3A", "R-4A", 
+                                 "R-2C", "R-2AC", "R-2AC", "R-3AC", "R-3C", "R-4AC") ~ "Single-Family protected",
+    TRUE ~ NA_character_  # Fallback for any other values not captured
+  )) %>%
   # filter(`SALE YEAR` >= 1925) %>%   
-  group_by(`SALE YEAR`, `ZONING CODE`, Code_Age) %>%  
+  group_by(`SALE YEAR`, 
+           `Facet`, 
+           # `ZONING CODE`, 
+           Zoning_Protection
+           # Code_Age
+           ) %>%  
   summarise(Median_Unit_Value = median(`SALE AMOUNT`, na.rm = TRUE)) %>%
   ungroup() %>%
   mutate(Lot_Size_Description = case_when(
@@ -668,6 +797,8 @@ Henrico_Med_Test <- Henrico %>%
     TRUE ~ NA_character_  # Fallback for any other values not captured
   )) 
   
+  
+  
 Henrico_Med_Test <- Henrico_Med_Test %>% 
   mutate(Median_Unit_Value_Inf = adjust_for_inflation(Median_Unit_Value, 
                                                   `SALE YEAR`, "US", to_date = 2020)) %>%
@@ -676,59 +807,80 @@ Henrico_Med_Test <- Henrico_Med_Test %>%
   
 
 #Median sale value by year (and code) adjusted to 2020 dollars
-ggplot(Henrico_Med_Test %>%
-         filter((`ZONING CODE` %in% c("A1", "R0", "R1", "R2", "R3", "R4", "R5", "R6", "RTH"))), 
-       aes(x = `SALE YEAR`, y = Median_Unit_Value_Inf, color = Color, 
-                     group = `ZONING CODE`, linetype = Linetype)) +
-  geom_line() +
-  # facet_grid(fct_relevel(Lot_Size_Description) ~ .,
-  #            scales = "free_y", space = "free",
-  #            switch = "y") +
-  facet_grid(fct_relevel(Lot_Size_Description, "R6 and Townhouses", "R5", "R4", "R3", "R2", "A1, R0, and R1") ~ .,
-             # scales = "free_y", space = "free",
-             switch = "y"
-  ) +
+ggplot(Henrico_Med_Test 
+       # %>%
+       #   filter((`ZONING CODE` %in% c("A-1", "R-0", "R-1", "R-2", "R-3", "R-4", "R-5", "R-6", "RTH")))
+       , 
+       aes(x = `SALE YEAR`, y = Median_Unit_Value_Inf, color = Facet, 
+                     group = `Facet`)) +
+  geom_line(size = 0.75) +
+  facet_grid(fct_relevel(`Zoning_Protection`) ~ .,
+             # scales = "free_y", 
+             space = "free",
+             switch = "y") +
+  # facet_grid(fct_relevel(Lot_Size_Description, "R-6 and Townhouses", "R-5", "R-4", "R-3", "R-2", "A-1, R-0, and R-1") ~ .,
+  #            # scales = "free_y", space = "free",
+  #            switch = "y"
+  # ) +
   # geom_rect(aes(xmin = start, xmax = above200_end, ymin = 0, ymax = Inf,
   #               fill = Transitional), col = NA, alpha = 1) +  
   # geom_vline(xintercept = seq(0, 36.5, by = 5), color = "black", alpha = 0.5, linetype = "solid", size = 0.2) +  # geom_vline(xintercept = 8.94, color = 'darkgrey', linetype = 'solid', linewidth = 0.25) +
   # geom_vline(xintercept = distances$x, color = "black", linetype = "longdash", size = 1) +
-  geom_vline(xintercept = 1933, color = "darkgrey", linetype = "longdash", size = 1) +
-  geom_vline(xintercept = 1942, color = "darkgrey", linetype = "longdash", size = 1) +
-  geom_vline(xintercept = 1945, color = "darkgrey", linetype = "longdash", size = 1) +
-  geom_vline(xintercept = 1960, color = "darkgrey", linetype = "longdash", size = 1) +
-  geom_vline(xintercept = 2022, color = "darkgrey", linetype = "longdash", size = 1) +
+  geom_vline(xintercept = 1960, color = "darkgrey", linetype = "solid", size = 0.75) +
+  geom_text(data = Henrico_Med_Test %>% filter(`Facet` == "Not Protected"),  # Filtering inside the layer
+            aes(x = 1960.25, y = 550000, angle = 0, label = "1960 ordinance"), 
+            hjust = 0, color = "black", size = 3.5) +
+  geom_vline(xintercept = 2022, color = "darkgrey", linetype = "solid", size = 0.75) +
+  geom_text(data = Henrico_Med_Test %>% filter(`Facet` == "Not Protected"),  # Filtering inside the layer
+            aes(x = 2009, y = 550000, angle = 0, label = "2022 zoning ordinance"), 
+            hjust = 0, color = "black", size = 3.5) +
+  geom_vline(xintercept = 2022, color = "darkgrey", linetype = "solid", size = 1) +
   # scale_fill_manual(values = c("Urban" = "#c8edc7", "Unstable" = "#e8c2ed", "Suburban" = "#fae3c5"), guide = "none") +
   # geom_smooth(span = 0.1, method = "loess", fill = "lightgrey", alpha = 0, size = 0.85) +
   # geom_hline(yintercept = 1, color = 'black', linetype = 'dashed') +
   theme_minimal() +
   scale_y_continuous(labels = label_dollar(),
-                     breaks = c(0, 500000, 1000000),
+                     breaks = c(0, 250000, 500000),
                      position = "right") +
-  scale_color_manual(values = c("Standard R code" = "black",
-                                "A subcodes" = "#1f78b4",
-                                "AC subcodes" = "#a6cee3",
-                                "C subcodes" = "#bdbdbd",
-                                "Townhouses" = "#998ec3",
-                                "A1" = "#1b9e77",
-                                "R0" = "#d95f02"),
-                     name = NULL) +
-  scale_linetype_manual(values = c("A, C, and AC" = "dashed",
-                                "Standard R code" = "solid",
-                                "Townhouses" = "dashed",
-                                "A1" = "solid",
-                                "R0" = "solid"),
-                        guide = "none") +
-  labs(x = "Year of sale",
-       y = "Median parcel unit sale value",
-       subtitle = NULL,
-       # caption = "Color shading represents <span style='color:#4daf4a;'>urban</span>, 
-       # <span style='color:#984ea3;'>transitional</span>, and 
-       # <span style='color:#fdbf6f;'>suburban</span> census tracts"
-       ) +
-  theme(plot.subtitle = element_text(hjust = 0.5, size = 13, face = "bold"),
+  scale_color_manual(values = c("Concentrated affluence" = "#7f3b08",
+                               "Non-concentrated affluence" = "darkgrey"),
+                    name = NULL, guide = "none") +
+  # scale_color_manual(values = c("Standard R code" = "black",
+  #                               "A subcodes" = "#1f78b4",
+  #                               "AC subcodes" = "#a6cee3",
+  #                               "C subcodes" = "#bdbdbd",
+  #                               "Townhouses" = "#998ec3",
+  #                               "A1" = "#1b9e77",
+  #                               "R0" = "#d95f02"),
+  #                    name = NULL) +
+  # scale_linetype_manual(values = c("A, C, and AC" = "dashed",
+  #                               "Standard R code" = "solid",
+  #                               "Townhouses" = "dashed",
+  #                               "A1" = "solid",
+  #                               "R0" = "solid"),
+  #                       guide = "none") +
+  # labs(x = "Year of sale",
+  #      y = "Median parcel unit sale value",
+  #      subtitle = NULL,
+  #      # caption = "Color shading represents <span style='color:#4daf4a;'>urban</span>, 
+  #      # <span style='color:#984ea3;'>transitional</span>, and 
+  #      # <span style='color:#fdbf6f;'>suburban</span> census tracts"
+  #      ) +
+  labs(title = "Henrico County",
+       subtitle = "Areas of <span style='color:#7f3b08;'>concentrated affluence</span> and areas <span style='color:darkgrey;'>not of concentrated affluence</span>",
+       x = NULL,
+       y = "Median parcel sale value",
+       caption = "All sales adjusted to 2020 dollars"
+  ) +
+  # scale_y_continuous(labels = label_dollar(),
+  #                    breaks = c(0, 250000, 500000, 750000, 1000000, 1250000, 1500000),
+  #                    position = "right") +
+  scale_x_continuous(breaks = c(1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020)) +
+  coord_cartesian(xlim=c(1952, 2020)) +
+  theme(plot.subtitle = element_markdown(hjust = 0.5, size = 13, face = "bold"),
         strip.placement = "outside",
         strip.text.y = element_markdown(size = 12, face = "bold"), 
-        axis.text.x = element_text(size = 11, hjust = 0.75, vjust = 0.825),
+        axis.text.x = element_text(size = 11, hjust = 0.5, vjust = 0.825),
         axis.text.y = element_markdown(size = 12),
         plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
         legend.position = "right",
@@ -740,22 +892,17 @@ ggplot(Henrico_Med_Test %>%
         panel.grid.minor.y = element_line(size = 0.1),
         panel.border = element_rect(color = "black", fill = NA, size = 0.75)
   ) +
-  guides(color = guide_legend(override.aes = list(linetype = c("dashed", "solid", "dashed", "dashed", "solid", "solid", "solid"),
-                                                  size = 1.5)),  # Increase line width in the legend
-         title = element_blank()) +
-  geom_text(data = Med_Test[Med_Test$Lot_Size_Description == "R6 and Townhouses", ], 
-            aes(x = 1905, y = 1100000, label = "County implements first\nzoning ordinance"), 
-            hjust = 0, color = "black", size = 3.5) +
-  geom_text(data = Med_Test[Med_Test$Lot_Size_Description == "R6 and Townhouses", ], 
-            aes(x = 1960.5, y = 1100000, label = "1960 zoning ordinance"), 
-            hjust = 0, color = "black", size = 3.5) 
+  # guides(color = guide_legend(override.aes = list(linetype = c("dashed", "solid", "dashed", "dashed", "solid", "solid", "solid"),
+  #                                                 size = 1.5)),  # Increase line width in the legend
+  #        title = element_blank()) +
+
   
-# ggsave("Henrico_Sales_All.png",
-#        path = "~/desktop",
-#        width = 10,
-#        height = 12,
-#        units = "in",
-#        dpi = 500)
+ggsave("Henrico_Sales_RENAME_FACET.png",
+       path = "~/desktop",
+       width = 10,
+       height = 12,
+       units = "in",
+       dpi = 500)
 
 #median sale value of parcel by zoning code in that year
 #Henrico

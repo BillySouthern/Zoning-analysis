@@ -11,6 +11,9 @@ require(sf)
 library(tigris)
 library(readxl)
 
+#For viz
+library(tmap)
+
 options(tigris_use_cache = TRUE)
 
 #Set parameters (state and year)
@@ -630,7 +633,7 @@ ggplot() +
 #----
 #For initial visualizing of Richmond
 ggplot() + 
-  # geom_sf(data = CentralCities_2020, fill = NA, color = "black", linewidth = 0.65) +
+  geom_sf(data = CentralCities_2020, fill = NA, color = "black", linewidth = 0.65) +
   geom_sf(data = CBSA_2020, color = "black", fill = "white", linewidth = 0.6) +
   geom_sf(data = Amelia_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
   geom_sf(data = Charles_City, aes(fill = Code), col = NA, linewidth = 0.1) +
@@ -642,7 +645,7 @@ ggplot() +
   geom_sf(data = Hanover_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
   geom_sf(data = Henrico_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
   geom_sf(data = Hopewell_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
-  geom_sf(data = KingQueen_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
+  geom_sf(data = KingQueen_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) + 
   geom_sf(data = King_William_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
   geom_sf(data = NewKent_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
   geom_sf(data = Petersburg_Zoning, aes(fill = Code), col = "white", linewidth = 0.1) +
@@ -748,4 +751,219 @@ setdiff(CP$"2013 unique use", CP$"2023 unique use")
 #Zoning check
 intersect(CP$"2013 unique zoning", CP$"2023 unique zoning")
 setdiff(CP$"2013 unique zoning", CP$"2023 unique zoning")
+
+
+#-------------------------------------------------------------------------------
+#Mapping residential zoning codes across Hanover and Henrico
+
+#Load Hanover and Henrico 
+#Hanover
+Hanover_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Hanover/Zoning.shp")) %>%
+  mutate(County = "Hanover",
+         Year = 2019) %>%
+  rename(Code = CLASS) %>%
+  st_transform(st_crs(CoR_Zoning)) 
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Hanover_Zoning <- Hanover_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry) %>%
+  mutate(Residential_Code = case_when(
+    Zoning_Atlas_Definition == "Mixed with Residential" ~ "Mixed with Residential",
+    Zoning_Atlas_Definition == "Nonresidential" ~ "Nonresidential",
+    Zoning_Atlas_Definition == "Primarily Residential" ~ Code,
+    TRUE ~ NA_character_  # Optional: handle unexpected values
+  )) %>%
+  mutate(geometry = st_make_valid(geometry)) %>%  # <- fix geometries
+  mutate(Mapping_Variable = case_when(
+    Residential_Code %in% c("Mixed with Residential", "PMH", "PUD") ~ "Mixed with Residential",
+    is.na(Residential_Code) | Residential_Code == "Nonresidential" ~ "Nonresidential",
+    TRUE ~ Residential_Code
+  ),
+  Mapping_Variable = case_when(
+    Mapping_Variable == "RRC" ~ "RC",
+    Mapping_Variable == "RR-1" ~ "R-1",
+    Mapping_Variable == "A-1" ~ "Agricultural",
+    Mapping_Variable == "AR-1" ~ "Agricultural",
+    Mapping_Variable == "AR-2" ~ "Agricultural",
+    Mapping_Variable == "AR-6" ~ "Agricultural",
+    TRUE ~ Mapping_Variable
+  )) %>%
+  group_by(Mapping_Variable) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") 
+
+#Make Hanover boundary
+#Counties within Virginia
+VirginiaCounties <- counties(state = "VA", cb = T, resolution = "500k", year = 2021) 
+
+#Filter Hen Han
+HanHen_Boundaries <- VirginiaCounties %>%
+  filter(NAME %in% c("Hanover", "Henrico")) %>%
+  st_boundary() %>%    
+  st_as_sf()    
+
+#Create spatial extent for the map
+HanHen_SE <- VirginiaCounties %>%
+  filter(NAME %in% c("Hanover", "Henrico")) %>%
+  st_union() %>%
+  st_as_sf()   
+  
+
+#Henrico
+Henrico_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Henrico/Zoning.shp")) %>%
+  mutate(County = "Henrico",
+         Year = 2022) %>%
+  rename(Code = ZONE_NAME) %>%
+  mutate(Code = str_remove(Code, "C$")) %>% #Remove conditional category
+  #select(Code, County, Year, geometry) %>%
+  mutate(Code = case_when( #One parcel in the process of rezoning from A to R-3
+    ZONE_LABEL == "REZ2019-00027" ~ "R-3",  # Update this line as needed
+    Code == "x" ~ "A-1",  #One zoning code set to x
+    TRUE ~ Code
+  )) %>%
+  st_transform(st_crs(CoR_Zoning)) 
+
+# #Export raw
+# st_write(Henrico_Zoning, "~/Desktop/RVA Zoning/Raw data/Henrico_Zoning.shp") 
+
+
+#Load zoning description
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+
+#Join descriptions with code
+Henrico_Zoning <- Henrico_Zoning %>%
+  left_join(RVA_Zoning_Descriptions, by= c("County", "Code")) %>%
+  select(County, Year, Code, Name, Nature, Housing_Description, Maximum_Density_Allowed, Zoning_Atlas_Definition, Source, geometry) %>%
+  mutate(Mapping_Variable = case_when(
+    Zoning_Atlas_Definition == "Mixed with Residential" ~ "Mixed with Residential",
+    Zoning_Atlas_Definition == "Nonresidential" ~ "Nonresidential",
+    Zoning_Atlas_Definition == "Primarily Residential" ~ Code,
+    TRUE ~ NA_character_  # Optional: handle unexpected values
+  )) %>%
+  # mutate(geometry = st_make_valid(geometry)) %>%  # <- fix geometries
+  # mutate(Mapping_Variable = case_when(
+  #   Residential_Code %in% c("Mixed with Residential", "PMH", "PUD") ~ "Mixed with Residential",
+  #   is.na(Residential_Code) | Residential_Code == "Nonresidential" ~ "Nonresidential",
+  #   TRUE ~ Residential_Code
+  # ),
+  # Mapping_Variable = case_when(
+  #   Mapping_Variable == "RRC" ~ "RC",
+  #   Mapping_Variable == "RR-1" ~ "R-1",
+  #   TRUE ~ Mapping_Variable
+  # )) %>%
+  mutate(Mapping_Variable = case_when(
+    Mapping_Variable == "A-1" ~ "Agricultural",
+    TRUE ~ Mapping_Variable
+  )) %>%
+  group_by(Mapping_Variable) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") 
+
+#Test map
+ggplot() + 
+  geom_sf(data = Hanover_Zoning, aes(fill = Mapping_Variable), col = "white", linewidth = 0.1) +
+  geom_sf(data = Henrico_Zoning, aes(fill = Mapping_Variable), col = "white", linewidth = 0.1)
+
+#Plot with tmap
+Hanover_color_values <- c(`Agricultural` = "lightgrey",
+                          `Mixed with Residential` = "darkgrey",
+                          `Nonresidential` = "white", 
+                          `R-1` = "#ffffb2", 
+                          `R-2` = "#fed976",
+                          `R-3` = "#feb24c", 
+                          `R-4` = "#fd8d3c",
+                          `R-5` = "#f03b20", 
+                          `R-6` = "#bd0026", 
+                          `RC` = "#7570b3",
+                          `RM` = "#d95f02", 
+                          `RS` = "#1b9e77")
+
+Henrico_color_values <- c(`Agricultural` = "lightgrey",
+                          `Mixed with Residential` = "darkgrey",
+                          `Nonresidential` = "white", 
+                          `R-0` = "#ffffcc",
+                          `R-1` = "#ffffb2", 
+                          `R-1A` = "#ffffb2", 
+                          `R-2` = "#fed976",
+                          `R-2A` = "#fed976",
+                          `R-3` = "#feb24c", 
+                          `R-3A` = "#feb24c", 
+                          `R-4` = "#fd8d3c",
+                          `R-4A` = "#fd8d3c", 
+                          `R-5` = "#f03b20", 
+                          `R-5A` = "#f03b20", 
+                          `R-6` = "#bd0026", 
+                          `RTH` = "#800026")
+
+tmap_options(check.and.fix = TRUE)
+
+HanHen_Zoning <- tm_shape(HanHen_SE) +
+  tm_fill(col = "white") + 
+  tm_shape(Hanover_Zoning) +
+  tm_fill("Mapping_Variable",
+          style = "fixed", 
+          palette = Hanover_color_values,
+          colorNA = "white",  
+          midpoint = NA,
+          # breaks = c(-Inf, -2, -1, 0, 1, 2, Inf),
+          alpha = 1,
+          legend.show = F) +
+  tm_borders(alpha = 1,
+             col = "white",
+             lty = "solid",
+             lwd = .35) +
+  # tm_layout(legend.position = c(0.8, 0.5)) +  
+  # tm_add_legend(type = "fill", 
+  #               title = "Hanover County",
+  #               labels = names(Hanover_color_values),
+  #               col = Hanover_color_values) +
+  tm_shape(Henrico_Zoning) +
+  tm_fill("Mapping_Variable",
+          style = "fixed", 
+          palette = Henrico_color_values,
+          colorNA = "white",  
+          midpoint = NA,
+          # breaks = c(-Inf, -2, -1, 0, 1, 2, Inf),
+          alpha = 1,
+          legend.show = F) +
+  tm_borders(alpha = 1,
+             col = "white",
+             lty = "solid",
+             lwd = .35) +
+  # tm_layout(legend.position = c(0.8, 0.65)) +  
+  # tm_add_legend(type = "fill", 
+  #               title = "Henrico County",
+  #               labels = names(Henrico_color_values),
+  #               col = Henrico_color_values) +
+  #tm_facets(by=c("Year"), ncol  = 2) +
+  tm_layout(main.title.size = 1.4,
+            main.title.position = "center",
+            main.title.fontface = "bold",
+            frame = F,
+            # legend.position = c(0.05, 0.85), 
+            legend.title.size = 0.65,
+            legend.title.fontface = "bold",
+            legend.text.size = 1,
+            legend.outside = F,
+            legend.show = T,
+            panel.show = F,
+            panel.label.bg.color = "transparent",
+            panel.label.color = "black",
+            panel.labels = c(""),
+            panel.label.fontface = "bold",
+            # inner.margins = c(0.0, -0.0, 0.0, -0.2)
+  ) +
+  tm_shape(HanHen_Boundaries) +
+  tm_lines(col="black", lwd = 1, scale=2, legend.lwd.show = FALSE)  
+
+#To save
+tmap_save(
+  tm = HanHen_Zoning,
+  filename = "~/desktop/HanHen_Zoning.png",
+  height = 10.5,
+  width = 9,
+  dpi = 500
+)
 

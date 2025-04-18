@@ -84,7 +84,7 @@ Counties_2020 <- counties(ST,
 #Group by each column
 Zoning_Atlas <- Richmond_Zoning %>%
   group_by(County, ZA_Def) %>%
-  rename("Zoning Atlas Definition" = ZA_Def) %>%
+  # rename("Zoning Atlas Definition" = ZA_Def) %>%
   summarise(geometry = st_union(geometry)) %>%  # Dissolve by union
   ungroup() 
 
@@ -159,7 +159,7 @@ Nature_Zoning <- Richmond_Zoning %>%
   ungroup() 
  
 #Export
-st_write(Nature_Zoning, "~/Desktop/Exp_Builder_Data/Nature/Zoning_Nature.shp")
+# st_write(Nature_Zoning, "~/Desktop/Exp_Builder_Data/Nature/Zoning_Nature.shp")
 
 
 
@@ -172,6 +172,134 @@ Counties <- st_transform(Counties_2020, 4326)
 
 #Assign colors
 
+#add in building footprint
+
+# Define the path to the shapefile
+shapefile_path <- "/Users/billy/Desktop/Exp_Builder_Data/Richmond_Buildings/Richmond_Buildings.shp"
+shapefile_path <- "/Users/billy/Desktop/Exp_Builder_Data/Richmond_Buildings/Buffered_Buildings.shp"
+
+# Load the shapefile
+VA_Buildings <- st_read(shapefile_path)  
+setDT(VA_Buildings)
+
+
+
+#Filter by counties
+localities <- c("Amelia County","Charles City", "Colonial Heights City", "Chesterfield County", "Richmond City", 
+                "Dinwiddie County", "Goochland County", "Hanover County", 
+                "Henrico County", "Hopewell City", "King William County", "King and Queen", 
+                "New Kent County", "Petersburg City", "Powhatan County", "Prince George County", "Sussex County")
+
+# Remove " County" from LOCALITIES column using := in data.table
+# VA_Buildings[, LOCALITY := sub(" County$", "", LOCALITY)]
+
+# Filter rows based on localities
+Richmond_Buildings <- VA_Buildings %>%
+  filter(str_detect(LOCALITY, paste(localities, collapse = "|")))
+
+
+
+Richmond_Buildings_transformed <- st_transform(Richmond_Buildings, st_crs(Zoning_Atlas))
+
+Test <- Richmond_Buildings %>%
+  st_join(Zoning_Atlas, left = TRUE)
+
+
+
+Richmond_Buildings_transformed <- st_transform(Richmond_Buildings, st_crs(Zoning_Atlas))
+
+Test <- Richmond_Buildings_transformed %>%
+  st_join(Zoning_Atlas, left = TRUE)
+
+
+# Filter rows based on the locality names with " County" appended
+Richmond_Buildings <- VA_Buildings %>%
+  filter(str_detect(LOCALITY, paste(str_c(localities, " City"), collapse = "|")))
+
+#export
+# st_write(Richmond_Buildings, "~/Desktop/Exp_Builder_Data/Richmond_Buildings/Richmond_Buildings.shp") 
+
+
+
+
+VA_buildings <- st_read("/Users/billy/Desktop/Exp_Builder_Data/Richmond_Buildings/Virginia.geojson")
+
+Test <- st_transform(VA_Buildings, st_crs(Nature_Zoning))
+
+
+VA_buildings_clean <- st_make_valid(VA_buildings_transformed)
+# Now perform the intersection
+VA_buildings_centroids <- st_centroid(VA_buildings_transformed)
+
+# Step 2: Clip the centroids to the Counties 2020 extent
+Test <- st_intersection(Test, Counties_2020)
+
+VA_buildings_buffered_0 <- st_buffer(VA_buildings_clean, dist = 0)
+
+
+ggplot() + 
+  geom_sf(data = Counties_2020)
+
+
+
+Test <- Richmond_Buildings %>%
+  st_set_crs(st_crs(Zoning_Atlas)) %>%
+    st_transform(st_crs(Zoning_Atlas))
+  
+Test <- st_transform(Richmond_Buildings, st_crs(Nature_Zoning))
+
+st_crs(Richmond_Buildings)
+st_crs(Zoning_Atlas)
+
+Zoning_Atlas_2 <- Zoning_Atlas  %>%
+  st_transform(st_crs(Counties))
+
+VA_Buildings <- VA_Buildings %>%
+  st_set_crs(st_crs(Nature_Zoning))  # Assign CRS if missing
+
+#Create points from buildings
+# Create centroids for each polygon
+VA_Buildings_Centroids <- VA_Buildings_Centroids %>%
+  # st_centroid() %>%
+  st_transform(st_crs(Zoning_Atlas))  # Transform to match CRS of Zoning_Atlas
+
+
+intersections <- st_intersects(VA_Buildings_Centroids, Zoning_Atlas)
+# Check if any centroid intersects any polygon
+summary(intersections)
+
+Test <- Richmond_Buildings_transformed %>%
+  st_join(Zoning_Atlas, join = st_intersects)
+
+
+Richmond_Buildings_transformed <- st_transform(Richmond_Buildings, st_crs(Zoning_Atlas))
+
+Test <- Richmond_Buildings_transformed %>%
+  st_join(Zoning_Atlas, left = TRUE)
+
+
+
+Test <- VA_Buildings %>%
+  st_set_crs(st_crs(Zoning_Atlas)) %>%   # Assign CRS if missing
+  st_make_valid() %>%                    # Fix geometries
+  st_transform(st_crs(Zoning_Atlas)) 
+
+Test <- st_set_crs(VA_Building_Centroids, st_crs(Zoning_Atlas))
+
+
+
+
+# Create an interactive map
+leaflet(VA_Buildings) %>%
+  addTiles() %>%  # Add default OpenStreetMap tiles
+  addPolygons(color = "black",        # Polygon border color
+              fillColor = "darkgrey", # Fill color
+              fillOpacity = 0.5,       # Fill opacity
+              weight = 0.5,            # Border thickness
+              popup = ~paste("Building ID:", row.names(VA_Buildings))) %>%  # Popup with building ID
+  addScaleBar() %>%
+  addMiniMap(toggleDisplay = TRUE)  # Add a minimap for navigation
+
 # Create the leaflet map 
 RVA_Zoning <- leaflet() %>%
   addMapPane(name = "polygons", zIndex = 410) %>% 
@@ -181,40 +309,41 @@ RVA_Zoning <- leaflet() %>%
                    options = leafletOptions(pane = "maplabels"),
                    group = "map labels") %>%
   addMiniMap(tiles = "CartoDB.Positron") %>%
+  
   #ZONING ATLAS DEFINITION
-  # addPolygons(
-  #   data = Zoning_Atlas,
-  #   fillColor = ~colorFactor(
-  #     palette = c("#80b1d3", "#fb8072", "#ffffb3"),
-  #     levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
-  #     domain = unique(Zoning_Atlas$ZA_Def)
-  #   )(ZA_Def),
-  #   color = ~colorFactor(
-  #     palette = c("#80b1d3", "#fb8072", "#ffffb3"),
-  #     levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
-  #     domain = unique(Zoning_Atlas$ZA_Def)
-  #   )(ZA_Def),
-  #   fillOpacity = 0.5,
-  #   weight = 0,
-  #   highlightOptions = highlightOptions(
-  #     color = "white",
-  #     fillOpacity = 1,
-  #     weight = 1
-  #   ),
-  #   group = "Zoning Atlas Definition",
-  #   label = ~Zoning_Atlas$ZA_Def,
-  #   options = pathOptions(pane = "polygons")  # Added pane option
-  # ) %>%
-  # addLegend(
-  #   position = "bottomleft",
-  #   pal = colorFactor(
-  #     palette = c("#80b1d3", "#fb8072", "#ffffb3"),
-  #     levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
-  #     domain = Zoning_Atlas$ZA_Def   # Adjusting domain directly
-  #   ),
-  #   values = Zoning_Atlas$ZA_Def,   # Removed the formula notation (~)
-  #   title = "Zoning Atlas Definition"
-  # ) %>%
+  addPolygons(
+    data = Zoning_Atlas,
+    fillColor = ~colorFactor(
+      palette = c("#80b1d3", "#fb8072", "#ffffb3"),
+      levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
+      domain = unique(Zoning_Atlas$ZA_Def)
+    )(ZA_Def),
+    color = ~colorFactor(
+      palette = c("#80b1d3", "#fb8072", "#ffffb3"),
+      levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
+      domain = unique(Zoning_Atlas$ZA_Def)
+    )(ZA_Def),
+    fillOpacity = 0.5,
+    weight = 0,
+    highlightOptions = highlightOptions(
+      color = "white",
+      fillOpacity = 1,
+      weight = 1
+    ),
+    group = "Zoning Atlas Definition",
+    label = ~Zoning_Atlas$ZA_Def,
+    options = pathOptions(pane = "polygons")  # Added pane option
+  ) %>%
+  addLegend(
+    position = "bottomleft",
+    pal = colorFactor(
+      palette = c("#80b1d3", "#fb8072", "#ffffb3"),
+      levels = c("Primarily Residential", "Mixed with Residential", "Nonresidential"),
+      domain = Zoning_Atlas$ZA_Def   # Adjusting domain directly
+    ),
+    values = Zoning_Atlas$ZA_Def,   # Removed the formula notation (~)
+    title = "Zoning Atlas Definition"
+  ) %>%
   # 
   # #MAXIMUM DENSITY
   # addPolygons(
