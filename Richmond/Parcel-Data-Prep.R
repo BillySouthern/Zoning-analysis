@@ -752,11 +752,23 @@ Henrico_Med_Test <- Henrico %>%
                                  "R-2C", "R-2AC", "R-2AC", "R-3AC", "R-3C", "R-4AC") ~ "Districts that 'provide and protect'",
     TRUE ~ NA_character_  # Fallback for any other values not captured
   )) %>%
+  mutate(
+    Lot_Size = case_when(
+      ACRES > 0   & ACRES <= 0.25  ~ "0 - 0.3 acres",
+      ACRES > 0.23 & ACRES <= 0.75     ~ "0.25 - 0.5 acres",
+      ACRES > 0.75                    ~ "Larger than 0.75 acres",
+      TRUE                         ~ NA_character_  # Handles missing or 0 values
+    )
+  ) %>%
+  arrange(ACRES) %>%  # optional: explicitly sort first
+  mutate(Acres_Tertile = ntile(ACRES, 3)) %>%
+  filter(!is.na(Lot_Size)) %>%
+  filter(!str_detect(PIN, "803-680-7933|763-730-8976|748-732-4135|754-731-8217")) %>%
   # filter(`SALE YEAR` >= 1925) %>%   
   group_by(`SALE YEAR`, 
            `Facet`, 
            # `ZONING CODE`, 
-           Zoning_Protection
+           Lot_Size
            # Code_Age
            ) %>%  
   summarise(Median_Unit_Value = median(`SALE AMOUNT`, na.rm = TRUE)) %>%
@@ -819,10 +831,10 @@ ggplot(Henrico_Med_Test
        # %>%
        #   filter((`ZONING CODE` %in% c("A-1", "R-0", "R-1", "R-2", "R-3", "R-4", "R-5", "R-6", "RTH")))
        , 
-       aes(x = `SALE YEAR`, y = Median_Unit_Value_Inf, color = `Zoning_Protection`, 
-                     group = `Zoning_Protection`)) +
-  geom_line(size = 0.75) +
-  facet_grid(fct_relevel(`Facet`) ~ .,
+       aes(x = `SALE YEAR`, y = Median_Unit_Value_Inf, color = `Facet`, 
+                     group = `Facet`)) +
+  geom_line(size = 1) +
+  facet_grid(fct_relevel(`Lot_Size`) ~ .,
              # scales = "free_y", 
              space = "free",
              switch = "y") +
@@ -836,22 +848,25 @@ ggplot(Henrico_Med_Test
   # geom_vline(xintercept = distances$x, color = "black", linetype = "longdash", size = 1) +
   geom_vline(xintercept = 1960, color = "black", linetype = "solid", size = 0.75) +
   geom_text(data = Henrico_Med_Test %>% filter(`Facet` == "Areas not concentrated affluence"),  # Filtering inside the layer
-            aes(x = 1960.25, y = 550000, angle = 0, label = "1960 zoning ordinance"), 
+            aes(x = 1960.25, y = 750000, angle = 0, label = "1960 zoning ordinance"),
             hjust = 0, color = "black", size = 3.5) +
   geom_vline(xintercept = 2022, color = "black", linetype = "solid", size = 0.75) +
   geom_text(data = Henrico_Med_Test %>% filter(`Facet` == "Areas not concentrated affluence"),  # Filtering inside the layer
-            aes(x = 2009, y = 550000, angle = 0, label = "2022 zoning ordinance"), 
+            aes(x = 2009, y = 750000, angle = 0, label = "2022 zoning ordinance"),
             hjust = 0, color = "black", size = 3.5) +
   # scale_fill_manual(values = c("Urban" = "#c8edc7", "Unstable" = "#e8c2ed", "Suburban" = "#fae3c5"), guide = "none") +
   # geom_smooth(span = 0.1, method = "loess", fill = "lightgrey", alpha = 0, size = 0.85) +
   # geom_hline(yintercept = 1, color = 'black', linetype = 'dashed') +
   theme_minimal() +
   scale_y_continuous(labels = label_dollar(),
-                     breaks = c(0, 250000, 500000),
+                     breaks = c(0, 250000, 500000, 750000),
                      position = "right") +
-  scale_color_manual(values = c("General residence district" = "#377eb8",
-                                "Districts that 'provide and protect'" = "#e41a1c"),
+  scale_color_manual(values = c("Areas not concentrated affluence" = "grey",
+                                "Concentrated affluence" = "#7f3b08"),
                      name = NULL, guide = "none") +
+  # scale_color_manual(values = c("General residence district" = "#377eb8",
+  #                               "Districts that 'provide and protect'" = "#e41a1c"),
+  #                    name = NULL, guide = "none") +
   # scale_color_manual(values = c("Areas of concentrated affluence" = "#7f3b08",
   #                              "Areas not concentrated affluence" = "darkgrey"),
   #                   name = NULL, guide = "none") +
@@ -878,7 +893,7 @@ ggplot(Henrico_Med_Test
   #      ) +
   labs(title = "Henrico County",
        # subtitle = "Areas of <span style='color:#7f3b08;'>concentrated affluence</span> and areas <span style='color:darkgrey;'>not of concentrated affluence</span>",
-       subtitle = "Parcel values of districts that &ldquo;<span style='color:#e41a1c;'>provide and protect</span>&rdquo; single-family areas and<br> those &ldquo;<span style='color:#377eb8;'>general residence</span>&rdquo; districts",
+       subtitle = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
        x = NULL,
        y = "Median parcel sale value",
        caption = "All sales adjusted to 2020 dollars"
@@ -909,10 +924,10 @@ ggplot(Henrico_Med_Test
   #        title = element_blank()) +
 
   
-ggsave("Henrico_Sales_ProtectvsGeneral.png",
+ggsave("Henrico_Sales_By_Acre.png",
        path = "~/desktop",
        width = 10,
-       height = 7,
+       height = 10,
        units = "in",
        dpi = 500)
 
