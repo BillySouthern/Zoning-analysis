@@ -674,7 +674,7 @@ Henrico_Density <- ggplot(Henrico %>%
                       scale = 1.1,
                       rel_min_height = 0.005, 
                       aes(fill = Facet), col = "black") + 
-  facet_grid(fct_relevel(`ZONING CODE`) ~ .,
+  facet_grid(fct_rev(`ZONING CODE`) ~ .,
              scales = "free_y", space = "free",
              # switch = "y"
              ) +
@@ -754,8 +754,8 @@ Henrico_Med_Test <- Henrico %>%
   )) %>%
   mutate(
     Lot_Size = case_when(
-      ACRES > 0   & ACRES <= 0.25  ~ "0 - 0.3 acres",
-      ACRES > 0.23 & ACRES <= 0.75     ~ "0.25 - 0.5 acres",
+      ACRES > 0   & ACRES <= 0.25  ~ "0 - 0.25 acres",
+      ACRES > 0.25 & ACRES <= 0.75     ~ "0.25 - 0.5 acres",
       ACRES > 0.75                    ~ "Larger than 0.75 acres",
       TRUE                         ~ NA_character_  # Handles missing or 0 values
     )
@@ -834,7 +834,7 @@ ggplot(Henrico_Med_Test
        aes(x = `SALE YEAR`, y = Median_Unit_Value_Inf, color = `Facet`, 
                      group = `Facet`)) +
   geom_line(size = 1) +
-  facet_grid(fct_relevel(`Lot_Size`) ~ .,
+  facet_grid(fct_rev(`Lot_Size`) ~ .,
              # scales = "free_y", 
              space = "free",
              switch = "y") +
@@ -847,12 +847,12 @@ ggplot(Henrico_Med_Test
   # geom_vline(xintercept = seq(0, 36.5, by = 5), color = "black", alpha = 0.5, linetype = "solid", size = 0.2) +  # geom_vline(xintercept = 8.94, color = 'darkgrey', linetype = 'solid', linewidth = 0.25) +
   # geom_vline(xintercept = distances$x, color = "black", linetype = "longdash", size = 1) +
   geom_vline(xintercept = 1960, color = "black", linetype = "solid", size = 0.75) +
-  geom_text(data = Henrico_Med_Test %>% filter(`Facet` == "Areas not concentrated affluence"),  # Filtering inside the layer
+  geom_text(data = Henrico_Med_Test %>% filter(`Lot_Size` == "Larger than 0.75 acres"),  # Filtering inside the layer
             aes(x = 1960.25, y = 750000, angle = 0, label = "1960 zoning ordinance"),
             hjust = 0, color = "black", size = 3.5) +
-  geom_vline(xintercept = 2022, color = "black", linetype = "solid", size = 0.75) +
-  geom_text(data = Henrico_Med_Test %>% filter(`Facet` == "Areas not concentrated affluence"),  # Filtering inside the layer
-            aes(x = 2009, y = 750000, angle = 0, label = "2022 zoning ordinance"),
+  geom_vline(xintercept = 2021, color = "black", linetype = "solid", size = 0.75) +
+  geom_text(data = Henrico_Med_Test %>% filter(`Lot_Size` == "Larger than 0.75 acres"),  # Filtering inside the layer
+            aes(x = 2008.5, y = 750000, angle = 0, label = "2021 zoning ordinance"),
             hjust = 0, color = "black", size = 3.5) +
   # scale_fill_manual(values = c("Urban" = "#c8edc7", "Unstable" = "#e8c2ed", "Suburban" = "#fae3c5"), guide = "none") +
   # geom_smooth(span = 0.1, method = "loess", fill = "lightgrey", alpha = 0, size = 0.85) +
@@ -1034,28 +1034,41 @@ ggplot(Henrico_Med_Test %>%
 
 
 
-
 #Hanover county
 Hanover_Med_Test <- Hanover %>%
   mutate(`SALE YEAR` = as.numeric(substr(`SALE DATE`, 1, 4))) %>%
   # filter(`SALE AMOUNT` <= 2000000) %>%   
-  filter(!`ZONING CODE` == "RR-1") %>%
-  mutate(Lot_Size = case_when(
-    `ZONING CODE` %in% c("A-1", "AR-1", "AR-2", "AR-6", "RC") ~ "Agricultural/rural zoning",
-    `ZONING CODE` %in% c("R-1", "R-2", "R-3", "RS") ~ "Single-family zoning",
-    `ZONING CODE` %in% c("R-4", "R-5", "RM") ~ "Mulitfamily and single-family zoning",
-    TRUE ~ NA_character_  # Fallback for any other values not captured
-  )) %>%
-  # filter(`SALE YEAR` >= 1925) %>%   
-  group_by(`SALE YEAR`, `Code_Age`,`Facet`) %>%  
-  summarise(Median_Unit_Value = median(`SALE AMOUNT`, na.rm = TRUE)) %>%
-  ungroup() %>%
+  # filter(!`ZONING CODE` == "RR-1") %>%
+  # mutate(Lot_Size = case_when(
+  #   `ZONING CODE` %in% c("A-1", "AR-1", "AR-2", "AR-6", "RC") ~ "Agricultural/rural zoning",
+  #   `ZONING CODE` %in% c("R-1", "R-2", "R-3", "RS") ~ "Single-family zoning",
+  #   `ZONING CODE` %in% c("R-4", "R-5", "RM") ~ "Mulitfamily and single-family zoning",
+  #   TRUE ~ NA_character_  # Fallback for any other values not captured
+  # )) %>%
   mutate(
-    Facet = str_replace_all(
-      as.character(Facet),
-      c(
-        "Non-concentrated affluence" = "Areas not concentrated affluence",
-        "Concentrated affluence" = "Concentrated affluence")))
+    Lot_Size = case_when(
+      ACRES > 0   & ACRES <= 0.25  ~ "0 - 0.25 acres",
+      ACRES > 0.25 & ACRES <= 0.75     ~ "0.25 - 0.75 acres",
+      ACRES > 0.75                    ~ "Larger than 0.75 acres",
+      TRUE                         ~ NA_character_  # Handles missing or 0 values
+    )
+  ) %>%
+  filter(!PIN %in% c("7815-96-6285")) %>%
+  filter(!(`SALE YEAR` %in% c(2003, 2004, 2006) & `SALE AMOUNT` < 145000)) %>%
+  arrange(ACRES) %>%  # optional: explicitly sort first
+  mutate(Acres_Tertile = ntile(ACRES, 3)) %>%
+  filter(!is.na(Lot_Size)) %>%
+  # filter(`SALE YEAR` >= 1925) %>%   
+  group_by(`SALE YEAR`, `Lot_Size`,`Code_Age`) %>%  
+  summarise(Median_Unit_Value = median(`SALE AMOUNT`, na.rm = TRUE)) %>%
+  ungroup() 
+# %>% 
+#   mutate(
+#     Facet = str_replace_all(
+#       as.character(Facet),
+#       c(
+#         "Non-concentrated affluence" = "Areas not concentrated affluence",
+#         "Concentrated affluence" = "Concentrated affluence")))
 
 #Below code tidies above object to recreate the larger 'all parcel' chart, not necessary for the following ggplot though
 # %>%
@@ -1089,12 +1102,6 @@ Hanover_Med_Test <- Hanover_Med_Test %>%
 
 
 
-
-
-
-
-  
-
 # ggplot(Hanover_Med_Test %>%
 #        # %>%
 #        # mutate(`ZONING CODE` = fct_relevel(`ZONING CODE`,
@@ -1117,43 +1124,34 @@ ggplot(Hanover_Med_Test
        ,
        aes(x = `SALE YEAR`, y = Median_Unit_Value_Inf, color = `Code_Age`, 
            group = `Code_Age`)) +
-  facet_grid(fct_relevel(`Facet`) ~ .,
+  facet_grid(fct_rev(`Lot_Size`) ~ .,
              # scales = "free_y", 
              space = "free",
              switch = "y") +
+  geom_line(size = 1, , lineend = "round", linejoin = "round") +
   geom_vline(xintercept = 1980, color = "black", linetype = "solid", size = 0.75) +
-  geom_text(data = Hanover_Med_Test %>% filter(Facet == "Areas not concentrated affluence"),  # Filtering inside the layer
-            aes(x = 1979, y = 330000, angle = 90, label = "SSA introduced"),
+  geom_text(data = Hanover_Med_Test %>% filter(Lot_Size == "Larger than 0.75 acres"),  # Filtering inside the layer
+            aes(x = 1979, y = 420000, angle = 90, label = "SSA introduced"),
             hjust = 0, color = "black", size = 3.5) +
   geom_vline(xintercept = 1999, color = "black", linetype = "solid", size = 0.75) +
-  # geom_text(data = Hanover_Med_Test %>% filter(Facet == "Concentrated affluence"),  # Filtering inside the layer
+  # geom_text(data = Hanover_Med_Test %>% filter(Lot_Size == "Larger than 0.75 acres"),  # Filtering inside the layer
   #           aes(x = 1998, y = 375000, angle = 90, label = "AR-1/2 and R-1 to R-3 replaced"),
   #           hjust = 0, color = "black", size = 3.5) +
-  geom_text(data = Hanover_Med_Test %>% filter(Facet == "Areas not concentrated affluence"),  # Filtering inside the layer
-            aes(x = 2000, y = 300000, angle = 90, label = "RC and RS added"),
+  geom_text(data = Hanover_Med_Test %>% filter(Lot_Size == "Larger than 0.75 acres"),  # Filtering inside the layer
+            aes(x = 2000, y = 420000, angle = 90, label = "RC and RS added"),
             hjust = 0, color = "black", size = 3.5) +
   geom_vline(xintercept = 2010, color = "black", linetype = "solid", size = 0.75) +
-  geom_text(data = Hanover_Med_Test %>% filter(Facet == "Areas not concentrated affluence"),  # Filtering inside the layer
-            aes(x = 2011, y = 400000, angle = 90, label = "RM added"),
+  geom_text(data = Hanover_Med_Test %>% filter(Lot_Size == "Larger than 0.75 acres"),  # Filtering inside the layer
+            aes(x = 2011, y = 420000, angle = 90, label = "RM added"),
             hjust = 0, color = "black", size = 3.5) +
-  # geom_vline(xintercept = 1960, color = "darkgrey", linetype = "solid", size = 0.75) +
-  # geom_text(data = Med_Test %>% filter(Lot_Size == "Multifamily units"),  # Filtering inside the layer
-  #           aes(x = 1959, y = 500000, angle = 90, label = "1960 ordinance"), 
-  #           hjust = 0, color = "black", size = 3.5) +
-  # geom_vline(xintercept = 2022, color = "darkgrey", linetype = "solid", size = 0.75) +
-  # geom_text(data = Med_Test %>% filter(Lot_Size == "Multifamily units"),  # Filtering inside the layer
-  #           aes(x = 2021, y = 500000, angle = 90, label = "2022 zoning ordinance"), 
-  #           hjust = 0, color = "black", size = 3.5) +
-  # geom_line(col = "white", size = 1.75) +
-  # geom_line(size = 0.75) +
-  geom_line(size = 0.75, , lineend = "round", linejoin = "round") +
   geom_hline(yintercept = 0, color = 'darkgrey', linetype = 'solid') +
   theme_minimal() +
   scale_y_continuous(labels = label_dollar(),
-                     breaks = c(0, 250000, 500000, 750000, 1000000, 1250000, 1500000),
+                     breaks = c(0, 250000, 500000, 750000),
                      position = "right") +
   scale_x_continuous(breaks = c(1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020)) +
-  coord_cartesian(xlim=c(1952, 2020)) +
+  coord_cartesian(xlim=c(1952, 2020),
+                  ylim = c(0, 750000)) +
   scale_color_manual(values = c("Active" = "#66c2a5",
                                 "Repealed" = "#e78ac3"),
                      name = NULL, guide = "none") +
@@ -1223,10 +1221,10 @@ ggplot(Hanover_Med_Test
   ) 
 
 
-ggsave("Hanover_Parcel_ActivevsRepea.jpg",
+ggsave("Hanover_ActiveRepealed_LotSize.png",
        path = "~/desktop",
        width = 10,
-       height = 7,
+       height = 10,
        units = "in",
        dpi = 500)
 
@@ -1319,4 +1317,55 @@ tmap_save(
   width = 8,
   dpi = 500
 )
+
+#---------------
+#Descriptive stats of parcels across Conc aff and non-Conc aff
+
+#Join two counties
+Hanover_Join <- Hanover %>%
+  select(`ZONING CODE`, Facet, PIN, `SITUS COUNTY`, County_Description, CoreLogic_Description, `ZONING CODE`, 
+         `ZONING CODE DESCRIPTION`, `MULTI OR SPLIT PARCEL CODE`, ACRES, `TOTAL SQUARE FOOTAGE ALL BUILDINGS`,
+         `LAND SQUARE FOOTAGE`, `YEAR BUILT`, `SALE DATE`, `SALE AMOUNT`, `MARKET TOTAL VALUE`, Unit_Value, Code_Age)
+
+Henrico_Join <- Henrico %>%
+  select(`ZONING CODE`, Facet, PIN, `SITUS COUNTY`, County_Description, CoreLogic_Description, `ZONING CODE`, 
+         `ZONING CODE DESCRIPTION`, `MULTI OR SPLIT PARCEL CODE`, ACRES, `TOTAL SQUARE FOOTAGE ALL BUILDINGS`,
+         `LAND SQUARE FOOTAGE`, `YEAR BUILT`, `SALE DATE`, `SALE AMOUNT`, `MARKET TOTAL VALUE`, Unit_Value, Code_Age) %>%
+  st_drop_geometry()
+
+Combined_Counties <- rbind(Hanover_Join, Henrico_Join)
+
+#Percent each zoning code
+Concentrated_Affluent_Values <- Combined_Counties %>%
+  filter(!is.na(Facet)) %>%
+  group_by(Facet, `ZONING CODE`) %>%
+  summarise(n = n(), .groups = "drop_last") %>%
+  mutate(percentage = 100 * n / sum(n))
+
+#Median/mean
+Concentrated_Affluent_Values <- Combined_Counties %>%
+  filter(!is.na(Facet)) %>%
+  filter(!str_starts(`ZONING CODE`, "A")) %>%
+  group_by(Facet) %>%
+  summarise(Mean = mean(ACRES, na.rm = TRUE))
+
+#Percent built after...
+Concentrated_Affluent_Values <- Combined_Counties %>%
+  filter(!is.na(Facet)) %>%
+  group_by(Facet) %>%
+  summarise(
+    total_units = n(),
+    units_built_after_2000 = sum(`YEAR BUILT` > 2000, na.rm = TRUE),
+    percent_built_after_2000 = 100 * units_built_after_2000 / total_units
+  )
+
+#Percent sold after 2000
+Concentrated_Affluent_Values <- Combined_Counties %>%
+  filter(!is.na(Facet)) %>%
+  group_by(Facet) %>%
+  summarise(
+    total_units = n(),
+    units_sold_after_threshold = sum(`SALE DATE` > 20150000, na.rm = TRUE),
+    percent_sold_after_threshold = 100 * units_sold_after_threshold / total_units
+  )
 
