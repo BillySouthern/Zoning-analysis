@@ -11,13 +11,14 @@ library(tidycensus)
 library(tmap)
 library(tmaptools)
 library(readxl)
-
-
+library(scales)
+library(ggtext)
 
   #For income seg work
 library(haven)
 library(RStata)
 library(spdep) #For spatial analyses
+library(priceR)
 
 options(tigris_use_cache = TRUE)
 
@@ -509,11 +510,13 @@ ggplot(Income_LISA_Henrico,
   #All analysis up to this point is at the tract level
 
 #See ACS variables
-income_variables <- load_variables(2020, "acs5")
+  #Note that there are several Block Groups with no incomes, 
+    #A few of these are from the census tract with no income too
+income_variables <- load_variables(2022, "acs5")
 
 #Download block level data
 #2020 Median HH income 
-Henrico_Income_2020 <- get_acs(
+Henrico_Income_2022 <- get_acs(
   geography = "block group", 
   variables = "B19013_001", 
   state = ST,
@@ -521,19 +524,437 @@ Henrico_Income_2020 <- get_acs(
   output = "wide",
   geometry = T) %>%
   filter(str_detect(GEOID, "51087")) %>%
-  rename("Income_2020" = B19013_001E,
-         "IncomeMOE_2020" = B19013_001M) %>%
+  rename("Income_2022" = B19013_001E,
+         "IncomeMOE_2022" = B19013_001M) %>%
   select(-NAME)
 
 #Exploratory map of Henrico LISA
 tmap_mode("view")  
 
-tm_shape(Henrico_Income_2020) +
+tm_shape(Henrico_Income_2022) +
   tm_polygons(
-    col = "Income_2020",     
+    col = "Income_2022",     
     # palette = c("red", "grey70", "green"),  
     alpha = 0.7,
     border.col = "black"
   ) +
   tm_basemap("OpenStreetMap")  
 
+#-------
+#Lisa by block group
+#Rerun LISA on just Henrico County tracts (as a test measure)
+#Create dataframe
+Income_LISA <- Henrico_Income_2022 %>%
+  filter(!Income_2022 == "NA") %>%
+  mutate(scaled_estimate = as.numeric(scale(Income_2022))) 
+
+# Income_LISA$scaled_estimate <- as.numeric(scale(Income_LISA$Med_Income_Adj))
+
+#Create spatial neighbors object
+neighbors <- poly2nb(Income_LISA$geometry, queen = TRUE)
+# summary(neighbors)
+
+# Ensure your data is an sf object
+Income_LISA <- st_as_sf(Income_LISA) 
+
+# Calculate centroids and extract coordinates
+Income_LISA_coords <- Income_LISA %>%
+  st_centroid() %>%
+  st_coordinates()
+
+#Create weights 
+weights <- nb2listw(neighbors, style = "W")
+
+#Isolate weights
+weights$weights[[1]]
+
+#Run LISA
+Income_LISA_Results <- localmoran_perm(
+  Income_LISA$scaled_estimate, 
+  weights, 
+  nsim = 999L, 
+  alternative = "two.sided"
+) %>%
+  as_tibble() %>%
+  set_names(c("Local_M_i", "Expected_i", "Variance_i", "Z_i", "Pval_i",
+              "Pval_i_sim", "Pvali_sim_folded", "Skewness", "Kurtosis"))
+
+#Join LISA with income data
+Income_LISA <- Income_LISA %>%
+  select(GEOID, Income_2022, scaled_estimate) %>%
+  mutate(lagged_estimate = lag.listw(weights, scaled_estimate)) %>%
+  bind_cols(Income_LISA_Results) 
+
+#Recreate string
+Income_LISA$Local_M_i <- as.numeric(Income_LISA$Local_M_i)
+
+#Set the clusters
+Income_LISA_Henrico <- Income_LISA %>%
+  mutate(lisa_cluster = case_when(
+    Pval_i >= 0.05 ~ "Not significant",
+    scaled_estimate > 0 & Local_M_i > 0 ~ "High-high", #High income, high-income neighbors
+    scaled_estimate > 0 & Local_M_i < 0 ~ "High-low", #High income, low-income neighbors
+    scaled_estimate < 0 & Local_M_i > 0 ~ "Low-low", #Low income, low-income neighbors
+    scaled_estimate < 0 & Local_M_i < 0 ~ "Low-high" #Low income, high-income neighbors
+  )) %>%
+  mutate(Tract_type = case_when(
+    Income_2022 >= 138750 ~ "Affluent tract",
+    Income_2022 <= 27750 ~ "Poor tract",
+  )) %>%
+  mutate(Concentrations = case_when(
+    Pval_i >= 0.05 ~ "Not significant",
+    Income_2022 > 27750 & Income_2022 <= 138750 & Local_M_i < 0 ~ "Not significant",  # Middle income
+    Income_2022 > 27750 & Income_2022 <= 138750 & Local_M_i > 0 ~ "Middle income clustered",  # Middle income
+    Income_2022 >= 138750 & Local_M_i < 0 ~ "High-none", #High income, not concentrated
+    Income_2022 >= 138750 & Local_M_i > 0 ~ "High-high", #High income, highly concentrated
+    Income_2022 <= 27750 & Local_M_i > 0 ~ "Low-high", #Low income, highly concentrated
+    Income_2022 <= 27750 & Local_M_i < 0 ~ "Low-none" #Low income, not concentrated
+  )) %>%
+  mutate(Facet = if_else(Concentrations == "High-high",
+                         "Concentrated affluence",
+                         "Non-concentrated affluence")) %>%
+  select(GEOID, Income_2022, scaled_estimate, Local_M_i, Facet, geometry)
+
+#Exploratory map of Henrico LISA
+tmap_mode("view")  
+
+tm_shape(Income_LISA_Henrico) +
+  tm_polygons(
+    col = "Facet",     
+    # palette = c("red", "grey70", "green"),  
+    alpha = 0.7,
+    border.col = "black") 
+  #+
+  # tm_shape(Henrico_LISA_Zoning_BG %>% filter(is.na(Facet))) +
+  # tm_dots(
+  #   col = "Facet",
+  #   size = 0.05,
+  #   alpha = 0.7,
+  #   border.col = "black"
+  # ) +
+  # tm_basemap("OpenStreetMap")  
+
+#Reload zoning parcel data to the block group LISA
+#set parameters
+#Select residential codes
+Henrico_Res_Zoning_Codes <- c("A1", "R0", "R1", "R1A", "R2", "R2A", "R2AC", "R2C", "R3", "R3A",
+                              "R3AC", "R3C", "R4", "R4A", "R4AC", "R5", "R5A", "R5AC", "R5C", "R6", "R6C",
+                              "RMP", "RO", "RTH", "RTHC")
+
+#Select residential descriptions
+Henrico_Res_Units <- c("APARTMENT", "COMMERCIAL DWELLING", "COMMON AREA (NON-HOA)", 
+                       "COMMON AREA/MASTER CARD", "CONDOMINIUM", "COOP", 
+                       "HOME OWNERS ASSOCIATION", "IMPROVED COMMON AREA", "MANUFACTURED HOME", "MOBILE HOME PARK", 
+                       "RES-IMPROVED < 5 ACRES", "RES-IMPROVED > 100 ACRES", 
+                       "RES-IMPROVED 10-20 ACRES", "RES-IMPROVED 20-100 ACRES", "RES-IMPROVED 5-10 ACRES",
+                       "RES-SUBD(1 FAM)", "RES-SUBD(2 FAM)", "RES-SUBD(3 FAM)", 
+                       "TOWNHOUSE", "VACANT < 5 ACRES", "VACANT > 100 ACRES", "VACANT 10-20 ACRES",
+                       "VACANT 20-100 ACRES", "VACANT 5-10 ACRES", "VACANT MULTI-FAMILY", 
+                       "VACANT RES (SUB WATERFRONT)", "VACANT RESIDENTIAL")
+
+Henrico_Res_Units <- c("Apartment", "Condominium", 
+                       "HOA(Improved)", "Manufactured Home", "Res - Imprv < 5 Acres", 
+                       "Res - Imprv > 100 Acres", "Res - Imprv 10 - 20 Acres", "Res - Imprv 20 - 100 Acres", 
+                       "Res - Imprv 10 - 20 Acres", 
+                       "Res - Imprv 20 - 100 Acres", "Res - Imprv 5 - 10 Acres", 
+                       "Res - Subd (1 Fam)", "Res - Subd (2 Fam)", "Res - Subd (3 Fam)",
+                       "Townhouse", "Vacant < 5 Acres", "Vacant > 100 Acres", 
+                       "Vacant 10 - 20 Acres", "Vacant 20 - 100 Acres", "Vacant 5 - 10 Acres", 
+                       "Vacant Common Area (HOA)", "Vacant Multi Fam R5-R6", "Vacant Res (Sub. Wtrfrnt)", 
+                       "Vacant Residential")
+
+#Load and tidy
+Henrico_Zoning_parcels <- read_rds(paste0(onedrivepath, "Mapping Richmond/Parcel-Buildings/Henrico/Henrico_Buildings_small.rds")) %>%
+  # mutate(PIN = str_remove(PIN, "\\.\\d+$")) %>%  # Remove the decimal part
+  # mutate(PIN = str_sub(PIN, 1, 12)) %>%
+  mutate(`ZONING CODE` = str_replace(`ZONING CODE`, "RO", "R0")) %>%
+  filter(`ZONING CODE` %in% Henrico_Res_Zoning_Codes) %>%
+  # filter(CoreLogic_Description == "MULTI-FAMILY" |
+  #          CoreLogic_Description == "SINGLE FAMILY RESID (SUBURBAN)" | 
+  #          CoreLogic_Description == "SINGLE FAMILY RESID (URBAN)") %>%
+  filter(County_Description %in% Henrico_Res_Units) %>%
+  filter(!(PIN %in% c("734-769-4535", "748-731-9963", "836-667-5251"))) %>%
+  filter(!(Number_of_Units %in% c(0))) %>%
+  mutate(Number_of_Units = ifelse(is.na(Number_of_Units), 1, Number_of_Units)) %>%
+  #Divide parcel value by number of units
+  mutate(Unit_Value = `MARKET TOTAL VALUE` / Number_of_Units) %>%
+  mutate(Code_Age = case_when(
+    `ZONING CODE` %in% c("A1", "R0", "R1", "R1A", "R2", "R2A", "R2AC", 
+                         "R2C", "R3", "R3A", "R3AC", "R3C", "R4", "R4A", "R4AC", "RMP") ~ "Single-family exclusive",
+    `ZONING CODE` %in% c("R5", "R5A", "R5AC", "R5C", "R6", 
+                         "R6C", "RTH", "RTHC") ~ "Single family and multifamily",
+    TRUE ~ "Active"  
+  ),
+  `ZONING CODE` = case_when(
+    `ZONING CODE` %in% c("A1", "R0", "R1", "R1A", "R2", "R2A", "R2AC", 
+                         "R2C", "R3", "R3A", "R3AC", "R3C", "R4", "R4A","R5", "R5A", "R5AC", "R5C", "R6", 
+                         "R6C", "RTH", "RTHC", "R4AC", "RMP") ~ 
+      str_replace(`ZONING CODE`, "(A|AR|R)([0-9])", "\\1-\\2"),
+    TRUE ~ `ZONING CODE`
+  )) %>%
+  filter(!is.na(`PARCEL LEVEL LATITUDE`)) %>%
+  st_as_sf(coords = c("PARCEL LEVEL LONGITUDE", "PARCEL LEVEL LATITUDE"), crs = 4326) 
+
+
+#Join the LISA and zoning
+#Match crs
+Henrico_Zoning_parcels <- st_transform(Henrico_Zoning_parcels, st_crs(Income_LISA_Henrico))
+
+#Merge parcel and conc aff
+Henrico_LISA_Zoning_BG <- st_join(Henrico_Zoning_parcels, Income_LISA_Henrico[, c("Facet", "Income_2022",
+                                                                                  "scaled_estimate", "Local_M_i")]) %>%
+  #then we remove the NAs, the parcels that are located in census tracts with no income and no LISA value
+  filter(!is.na(Facet)) %>%
+  filter(!is.na(ACRES)) %>%
+  mutate(
+    Lot_Size = case_when(
+      ACRES > 0   & ACRES <= 0.25  ~ "0 - 0.25 acres",
+      ACRES > 0.25 & ACRES <= 0.75     ~ "0.25 - 0.5 acres",
+      ACRES > 0.75                    ~ "Larger than 0.75 acres",
+      TRUE                         ~ NA_character_)) %>%  
+  mutate(
+    Zoning_Group_Acre = case_when(
+          ACRES > 0   & ACRES <= 0.2  ~ "Small lot zoned parcels",
+          ACRES > 0.2 & ACRES <= 0.5     ~ "Medium lot zoned parcels",
+          ACRES > 0.5                    ~ "Large lot zoned parcels",
+          TRUE                         ~ NA_character_)) %>%
+  mutate(
+    Zoning_Group = case_when(
+      `ZONING CODE` %in% c("A-1") ~ "Agricultural",
+      `ZONING CODE` %in% c("R-0") ~ "Very large lot zones",
+      `ZONING CODE` %in% c("R-1", "R-1A") ~ "Large lot zones",
+      `ZONING CODE` %in% c("R-2", "R-2C", "R-2A", "R-2AC", "R-3AC", "R-3C", "R-3", "R-3A") ~ "Medium lot zones",
+      `ZONING CODE` %in% c("R-5", "R-5A", "R-5AC", "R-5C", "R-6", "R-6C", "RTH", "RTHC", "RMP", "R-4", "R-4A", "R-4AC") ~ "Small lot zones",
+      TRUE ~ NA_character_  ))
+
+
+#Boxplot of codes and value
+Henrico_LISA_Zoning_BG %>%
+  filter(`Zoning_Group_Acre` %in% c("Large lot zoned parcels", "Medium lot zoned parcels")) %>%
+ggplot(aes(x = factor(`Facet`), 
+                                              # levels = c("R-0", "R-1")), 
+                                               # levels = c("A-1", "R-0", "R-1", "R-1A", "R-2", "R-2A", "R-2AC", 
+                                               #               "R-2C", "R-3", "R-3A", "R-3AC", "R-3C", "R-4", "R-4A", "R-4AC", 
+                                               #               "R-5", "R-5A", "R-5AC", "R-5C", "R-6", "R-6C",
+                                               #               "RMP", "R-O", "RPN", "RTH", "RTHC")), 
+                                   y = Unit_Value)) +
+  geom_boxplot(fill = "#80b1d3", color = "black") +
+  # facet_grid( . ~ fct_relevel(Code_Age, "Single-family exclusive", "Single family and multifamily"), 
+  #             scales = "free_x", space = "free") +
+  facet_grid(fct_rev(`Zoning_Group_Acre`) ~ .,
+             # scales = "free_y", 
+             space = "free",
+             switch = "y") +
+  theme_minimal() +
+  labs(
+    title = "Henrico County",
+    y = NULL,
+    x = NULL
+  ) +
+  theme(plot.subtitle = element_text(hjust = 0.5, size = 13, face = "bold"),
+        strip.placement = "outside",
+        strip.text.x = element_markdown(size = 12, face = "bold"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 0.75, vjust = 0.825),
+        axis.text.y = element_markdown(size = 14),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        legend.position = "right",
+        axis.title.x = element_blank(),
+        axis.title.y = element_markdown(size = 14),
+        panel.grid.major.x = element_line(size = 0.2, color = "grey"),
+        panel.grid.minor.x = element_line(size = 0),
+        panel.grid.major.y = element_line(size = 0.2, color = "grey"),
+        panel.grid.minor.y = element_line(size = 0.1),
+        panel.border = element_rect(color = "black", fill = NA, size = 0.75)
+  ) +
+  # coord_cartesian(ylim=c(0, 1000000)) +
+  scale_y_continuous(labels = label_dollar())
+
+#Plot line chart by conc and non conc
+Henrico_Med_Test <- Henrico_LISA_Zoning_BG %>%
+  mutate(`SALE YEAR` = as.numeric(substr(`SALE DATE`, 1, 4))) %>%
+  filter(`SALE AMOUNT` <= 2000000) %>%   
+  filter(!`ZONING CODE` %in% c("RMH", "RMP")) %>%
+  arrange(ACRES) %>%  # optional: explicitly sort first
+  mutate(Acres_Tertile = ntile(ACRES, 3)) %>%
+  filter(!is.na(Lot_Size)) %>%
+  filter(!str_detect(PIN, "803-680-7933|763-730-8976|748-732-4135|754-731-8217")) %>%
+  # filter(`SALE YEAR` >= 1925) %>%   
+  group_by(`SALE YEAR`, 
+           `Facet`, 
+           # `ZONING CODE`, 
+           # Lot_Size,
+           Zoning_Group_Acre
+  ) %>%  
+  summarise(Median_Unit_Value = median(`SALE AMOUNT`, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(
+    Facet = str_replace_all(
+      as.character(Facet),
+      c(
+        "Non-concentrated affluence" = "Areas not concentrated affluence",
+        "Concentrated affluence" = "Concentrated affluence")))
+
+#Adjust hosue value figures 
+Henrico_Med_Test <- Henrico_Med_Test %>% 
+  mutate(Median_Unit_Value_Inf = adjust_for_inflation(`Median_Unit_Value`, 
+                                                      `SALE YEAR`, "US", to_date = 2022)) %>%
+  filter(`Median_Unit_Value_Inf` <= 1500000)   
+
+#Median sale value by year (and code) adjusted to 2020 dollars
+ggplot(Henrico_Med_Test 
+       # %>%
+       #   filter((`ZONING CODE` %in% c("A-1", "R-0", "R-1", "R-2", "R-3", "R-4", "R-5", "R-6", "RTH")))
+       , 
+       aes(x = `SALE YEAR`, y = Median_Unit_Value_Inf, color = `Facet`, 
+           group = `Facet`)) +
+  geom_line(size = 1) +
+  facet_grid(fct_rev(`Zoning_Group_Acre`) ~ .,
+             # scales = "free_y", 
+             space = "free",
+             switch = "y") +
+  # facet_grid(fct_relevel(Lot_Size_Description, "R-6 and Townhouses", "R-5", "R-4", "R-3", "R-2", "A-1, R-0, and R-1") ~ .,
+  #            # scales = "free_y", space = "free",
+  #            switch = "y"
+  # ) +
+  # geom_rect(aes(xmin = start, xmax = above200_end, ymin = 0, ymax = Inf,
+  #               fill = Transitional), col = NA, alpha = 1) +  
+  # geom_vline(xintercept = seq(0, 36.5, by = 5), color = "black", alpha = 0.5, linetype = "solid", size = 0.2) +  # geom_vline(xintercept = 8.94, color = 'darkgrey', linetype = 'solid', linewidth = 0.25) +
+  # geom_vline(xintercept = distances$x, color = "black", linetype = "longdash", size = 1) +
+  geom_vline(xintercept = 1960, color = "black", linetype = "solid", size = 0.75) +
+  # geom_text(data = Henrico_Med_Test %>% filter(`Lot_Size` == "Larger than 0.75 acres"),  # Filtering inside the layer
+  #           aes(x = 1960.25, y = 750000, angle = 0, label = "1960 zoning ordinance"),
+  #           hjust = 0, color = "black", size = 3.5) +
+  geom_vline(xintercept = 2021, color = "black", linetype = "solid", size = 0.75) +
+  # geom_text(data = Henrico_Med_Test %>% filter(`Lot_Size` == "Larger than 0.75 acres"),  # Filtering inside the layer
+  #           aes(x = 2008.5, y = 750000, angle = 0, label = "2021 zoning ordinance"),
+  #           hjust = 0, color = "black", size = 3.5) +
+  # scale_fill_manual(values = c("Urban" = "#c8edc7", "Unstable" = "#e8c2ed", "Suburban" = "#fae3c5"), guide = "none") +
+  # geom_smooth(span = 0.1, method = "loess", fill = "lightgrey", alpha = 0, size = 0.85) +
+  # geom_hline(yintercept = 1, color = 'black', linetype = 'dashed') +
+  theme_minimal() +
+  scale_y_continuous(labels = label_dollar(),
+                     breaks = c(0, 250000, 500000, 750000),
+                     position = "right") +
+  scale_color_manual(values = c("Areas not concentrated affluence" = "grey",
+                                "Concentrated affluence" = "#7f3b08"),
+                     name = NULL, guide = "none") +
+  # scale_color_manual(values = c("General residence district" = "#377eb8",
+  #                               "Districts that 'provide and protect'" = "#e41a1c"),
+  #                    name = NULL, guide = "none") +
+  # scale_color_manual(values = c("Areas of concentrated affluence" = "#7f3b08",
+  #                              "Areas not concentrated affluence" = "darkgrey"),
+  #                   name = NULL, guide = "none") +
+  # scale_color_manual(values = c("Standard R code" = "black",
+  #                               "A subcodes" = "#1f78b4",
+  #                               "AC subcodes" = "#a6cee3",
+  #                               "C subcodes" = "#bdbdbd",
+  #                               "Townhouses" = "#998ec3",
+  #                               "A1" = "#1b9e77",
+  #                               "R0" = "#d95f02"),
+  #                    name = NULL) +
+  # scale_linetype_manual(values = c("A, C, and AC" = "dashed",
+  #                               "Standard R code" = "solid",
+  #                               "Townhouses" = "dashed",
+  #                               "A1" = "solid",
+  #                               "R0" = "solid"),
+  #                       guide = "none") +
+  # labs(x = "Year of sale",
+  #      y = "Median parcel unit sale value",
+  #      subtitle = NULL,
+  #      # caption = "Color shading represents <span style='color:#4daf4a;'>urban</span>, 
+  #      # <span style='color:#984ea3;'>transitional</span>, and 
+  #      # <span style='color:#fdbf6f;'>suburban</span> census tracts"
+  #      ) +
+  labs(title = "Henrico County",
+       # subtitle = "Areas of <span style='color:#7f3b08;'>concentrated affluence</span> and areas <span style='color:darkgrey;'>not of concentrated affluence</span>",
+       subtitle = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
+       x = NULL,
+       y = "Median parcel sale value",
+       caption = "All sales adjusted to 2022 dollars"
+  ) +
+  # scale_y_continuous(labels = label_dollar(),
+  #                    breaks = c(0, 250000, 500000, 750000, 1000000, 1250000, 1500000),
+  #                    position = "right") +
+  scale_x_continuous(breaks = c(1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020)) +
+  coord_cartesian(xlim=c(1952, 2020)) +
+  theme(plot.subtitle = element_markdown(hjust = 0.5, size = 13, face = "bold"),
+        strip.placement = "outside",
+        strip.text.y = element_markdown(size = 12, face = "bold"), 
+        axis.text.x = element_text(size = 11, hjust = 0.5, vjust = 0.825),
+        axis.text.y = element_markdown(size = 12),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        legend.position = "right",
+        axis.title.x = element_blank(),
+        axis.title.y = element_markdown(size = 14),
+        panel.grid.major.x = element_line(size = 0.2, color = "darkgrey"),
+        panel.grid.minor.x = element_line(size = 0.2, color = "lightgrey"),
+        panel.grid.major.y = element_line(size = 0.2, color = "grey"),
+        panel.grid.minor.y = element_line(size = 0.1),
+        panel.border = element_rect(color = "black", fill = NA, size = 0.75)
+  ) 
+# +
+# guides(color = guide_legend(override.aes = list(linetype = c("dashed", "solid", "dashed", "dashed", "solid", "solid", "solid"),
+#                                                 size = 1.5)),  # Increase line width in the legend
+#        title = element_blank()) +
+
+#---------------------------------------------------------------------------------
+#Descriptive stats of parcels across Conc aff and non-Conc aff
+
+#Percent each zoning code
+Concentrated_Affluent_Values <- Henrico_LISA_Zoning_BG %>%
+  filter(!is.na(Facet)) %>%
+  group_by(Facet, `Zoning_Group_Acre`) %>%
+  summarise(n = n(), .groups = "drop_last") %>%
+  mutate(percentage = 100 * n / sum(n))
+
+#Percent each acreage
+Concentrated_Affluent_Values <- Henrico_LISA_Zoning_BG %>%
+  filter(!is.na(Facet)) %>%
+  group_by(Facet, `Lot_Size`) %>%
+  summarise(n = n(), .groups = "drop_last") %>%
+  mutate(percentage = 100 * n / sum(n))
+
+#Unit share of land percent 
+#Percent each zoning code
+Concentrated_Affluent_Values <- Henrico_LISA_Zoning_BG %>%
+  filter(!is.na(Facet)) %>%
+  mutate(Unit_Percent = `LAND SQUARE FOOTAGE` / `TOTAL SQUARE FOOTAGE ALL BUILDINGS`) %>%
+  group_by(Facet, `Zoning_Group_Acre`) %>%
+    summarise(Median_Unit_Percent = median(Unit_Percent, na.rm = TRUE),
+              Mode_Unit_Percent = as.numeric(names(sort(table(Unit_Percent), decreasing = TRUE)[1])),
+              Min_Unit_Percent = min(Unit_Percent, na.rm = TRUE),
+              Max_Unit_Percent = max(Unit_Percent, na.rm = TRUE),
+              Range_Unit_Percent = Max_Unit_Percent - Min_Unit_Percent)
+
+#Median/mean
+  #Range needs filtering as there are two 20 acre farms
+Concentrated_Affluent_Values <- Henrico_LISA_Zoning_BG %>%
+  filter(!is.na(Facet)) %>%
+  filter(!str_starts(`ZONING CODE`, "A")) %>%
+  group_by(Facet, `Zoning_Group_Acre`) %>%
+  summarise(Mean = mean(ACRES, na.rm = TRUE),
+            Median = median(ACRES, na.rm = TRUE),
+            Mode_ACRES = as.numeric(names(sort(table(ACRES), decreasing = TRUE)[1])),
+            Min_ACRES = min(ACRES, na.rm = TRUE),
+            Max_ACRES = max(ACRES, na.rm = TRUE),
+            Range_ACRES = Max_ACRES - Min_ACRES)
+
+#Percent built after...
+Concentrated_Affluent_Values <- Henrico_LISA_Zoning_BG %>%
+  filter(!is.na(Facet)) %>%
+  group_by(Facet, `Zoning_Group_Acre`) %>%
+  summarise(
+    total_units = n(),
+    units_built_after_2000 = sum(`YEAR BUILT` > 2000, na.rm = TRUE),
+    percent_built_after_2000 = 100 * units_built_after_2000 / total_units
+  )
+
+#Percent sold after 2000
+Concentrated_Affluent_Values <- Henrico_LISA_Zoning_BG %>%
+  filter(!is.na(Facet)) %>%
+  group_by(Facet, `Zoning_Group_Acre`) %>%
+  summarise(
+    total_units = n(),
+    units_sold_after_threshold = sum(`SALE DATE` > 20150000, na.rm = TRUE),
+    percent_sold_after_threshold = 100 * units_sold_after_threshold / total_units
+  )

@@ -65,7 +65,7 @@ onedrivepath="~/OneDrive - The Pennsylvania State University/"
 # slice(1:25)
 
 # Load Corelogic Property data
-VA_property <- fread(paste0(onedrivepath, "Mapping Richmond/Parcel-Buildings/pennsylvania_state_university_property_basic2_300000230479867_20210409_102905_VA.txt"), 
+VA_property <- fread(paste0(onedrivepath, "Mapping Richmond/Parcel-Buildings/VA/pennsylvania_state_university_property_basic2_300000230479867_20210409_102905_VA.txt"), 
                      sep = "|", header = TRUE) 
 
 #Filter hanover and henrico
@@ -131,7 +131,7 @@ Hanover_Buildings_County <- read_excel(paste0(onedrivepath, "/Mapping Richmond/P
 #Merge CoreLogic and County data
 Hanover_Buildings <- Hanover_Buildings_County %>%
   left_join(Hanover_CL_Tidy, by = "PIN") %>%
-  select(PIN, `Sale Amount`, `MARKET TOTAL VALUE`)
+  # select(PIN, `Sale Amount`, `MARKET TOTAL VALUE`)
   mutate(    
     `BUILDING SQUARE FEET` = coalesce(as.numeric(Sqft), `BUILDING SQUARE FEET`),
     `YEAR BUILT` = ifelse(`Year Built` == 0, 
@@ -323,7 +323,7 @@ Henrico_CL_Tidy <- Hanover_Henrico_Builds %>%
 
 
 #Save
-# saveRDS(Henrico_CL_Tidy, "Henrico_Buildings_small.rds")
+saveRDS(Henrico_CL_Tidy, "Henrico_Buildings_small.rds")
 
 
 #-------------------------
@@ -1237,7 +1237,6 @@ Henrico <- read_rds(paste0(onedrivepath, "Mapping Richmond/Parcel-Buildings/Henr
                   str_detect(.x, regex("Manufacture|Mobile", ignore_case = TRUE)))) %>%
   st_as_sf(coords = c("PARCEL LEVEL LONGITUDE", "PARCEL LEVEL LATITUDE"), crs = 4326) %>%
   mutate(CoreLogic_Description = str_replace(str_to_lower(CoreLogic_Description), "^.", ~str_to_upper(.)))
-
 
 
 
