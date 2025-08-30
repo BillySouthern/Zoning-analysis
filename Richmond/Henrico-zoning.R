@@ -13,6 +13,7 @@ library(tmaptools)
 library(readxl)
 library(scales)
 library(ggtext)
+library(ggridges)
 
   #For income seg work
 library(haven)
@@ -505,7 +506,7 @@ ggplot(Income_LISA_Henrico,
   geom_smooth(method='lm', formula= y~x, aes(group = 1)) +
   facet_wrap(~ Zoning_Code, nrow = 3, strip.position = "top") 
 
-#------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------------
 #Redoing the above work at the block group unit
   #All analysis up to this point is at the tract level
 
@@ -706,6 +707,7 @@ Henrico_LISA_Zoning_BG <- st_join(Henrico_Zoning_parcels, Income_LISA_Henrico[, 
   #then we remove the NAs, the parcels that are located in census tracts with no income and no LISA value
   filter(!is.na(Facet)) %>%
   filter(!is.na(ACRES)) %>%
+  # filter(!str_detect(`ZONING CODE`, "A-1")) %>% #Test filter Agricultural
   mutate(
     Lot_Size = case_when(
       ACRES > 0   & ACRES <= 0.25  ~ "0 - 0.25 acres",
@@ -714,9 +716,9 @@ Henrico_LISA_Zoning_BG <- st_join(Henrico_Zoning_parcels, Income_LISA_Henrico[, 
       TRUE                         ~ NA_character_)) %>%  
   mutate(
     Zoning_Group_Acre = case_when(
-          ACRES > 0   & ACRES <= 0.2  ~ "Small lot zoned parcels",
-          ACRES > 0.2 & ACRES <= 0.5     ~ "Medium lot zoned parcels",
-          ACRES > 0.5                    ~ "Large lot zoned parcels",
+          ACRES > 0   & ACRES <= 0.25  ~ "Small lot zoned parcels",
+          ACRES > 0.25 & ACRES <= 0.75     ~ "Medium lot zoned parcels",
+          ACRES > 0.75                    ~ "Large lot zoned parcels",
           TRUE                         ~ NA_character_)) %>%
   mutate(
     Zoning_Group = case_when(
@@ -769,6 +771,59 @@ ggplot(aes(x = factor(`Facet`),
   # coord_cartesian(ylim=c(0, 1000000)) +
   scale_y_continuous(labels = label_dollar())
 
+#Geom density of parcel values
+Henrico_LISA_Zoning_BG %>%
+  filter(`Zoning_Group_Acre` %in% c("Large lot zoned parcels", "Medium lot zoned parcels")) %>%
+  ggplot(aes(x = Unit_Value, y = Facet)) +
+  # y = factor(`ZONING CODE`, 
+  #                            levels = rev(c("A-1", "R-0", "R-1", "R-1A", "R-2", "R-2A", "R-2AC", 
+  #                                           "R-2C", "R-3", "R-3A", "R-3AC", "R-3C", "R-4", "R-4A", "R-4AC", 
+  #                                           "R-5", "R-5A", "R-5AC", "R-5C", "R-6", "R-6C",
+  #                                           "RMP", "R-O", "RPN", "RTH", "RTHC"))))) +
+  geom_density_ridges(quantile_lines = TRUE, quantiles = 2,
+                      scale = 1.1,
+                      rel_min_height = 0.005, 
+                      aes(fill = Facet), col = "black") + 
+  facet_grid(fct_rev(`Zoning_Group_Acre`) ~ .,
+             # scales = "free_y", 
+             space = "free",
+             switch = "y") +
+  # facet_grid(fct_relevel(Code_Age, "Single-family exclusive", "Single family and multifamily") ~ .,
+  #            scales = "free_y", space = "free",
+  #            # switch = "y"
+  #            ) +
+  theme_minimal(base_size = 14) + 
+  scale_fill_manual(values = c("Concentrated affluence" = "#7f3b08",
+                               "Non-concentrated affluence" = "grey"),
+                    name = NULL, guide = "none") +
+  scale_x_continuous(labels = label_dollar(),
+                     breaks = c(0, 250000, 500000, 750000, 1000000, 1250000, 
+                                1500000, 1750000, 2000000, 2500000, 
+                                3000000, 3500000, 4000000, 4500000, 5000000)) +
+  coord_cartesian(xlim=c(00000,2000000)) +
+  theme_minimal() +
+  labs(
+    subtitle = "Henrico County",
+    y = NULL,
+    x = NULL
+  ) +
+  theme(plot.subtitle = element_text(hjust = 0.5, size = 14, face = "bold"),
+        strip.placement = "outside",
+        strip.text.y = element_markdown(size = 12, face = "bold"), 
+        axis.text.x = element_text(size = 11, angle = 45, hjust = 0.75, vjust = 0.825),
+        axis.text.y = element_blank(),
+        # axis.text.y = element_markdown(size = 12),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        legend.position = "right",
+        axis.title.x = element_blank(),
+        axis.title.y = element_markdown(size = 14),
+        panel.grid.major.x = element_line(size = 0.2, color = "darkgrey"),
+        panel.grid.minor.x = element_line(size = 0.2, color = "lightgrey"),
+        panel.grid.major.y = element_line(size = 0.2, color = "grey"),
+        panel.grid.minor.y = element_line(size = 0.1),
+        panel.border = element_rect(color = "black", fill = NA, size = 0.75)
+  ) 
+
 #Plot line chart by conc and non conc
 Henrico_Med_Test <- Henrico_LISA_Zoning_BG %>%
   mutate(`SALE YEAR` = as.numeric(substr(`SALE DATE`, 1, 4))) %>%
@@ -801,10 +856,11 @@ Henrico_Med_Test <- Henrico_Med_Test %>%
   filter(`Median_Unit_Value_Inf` <= 1500000)   
 
 #Median sale value by year (and code) adjusted to 2020 dollars
-ggplot(Henrico_Med_Test 
+Henrico_Med_Test %>%
+  filter(`Zoning_Group_Acre` %in% c("Large lot zoned parcels", "Medium lot zoned parcels")) %>%
+  ggplot(
        # %>%
        #   filter((`ZONING CODE` %in% c("A-1", "R-0", "R-1", "R-2", "R-3", "R-4", "R-5", "R-6", "RTH")))
-       , 
        aes(x = `SALE YEAR`, y = Median_Unit_Value_Inf, color = `Facet`, 
            group = `Facet`)) +
   geom_line(size = 1) +
