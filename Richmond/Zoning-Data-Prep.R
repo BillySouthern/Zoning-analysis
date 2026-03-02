@@ -28,7 +28,9 @@ CENTRAL_CITY = c("Richmond city")
 GEOG = "tract"
 
 #Create a filepath to OneDrive
-onedrivepath="~/OneDrive - The Pennsylvania State University/"
+# onedrivepath="~/OneDrive - The Pennsylvania State University/"
+#Create a filepath to OneDrive
+onedrivepath="~/Library/CloudStorage/OneDrive-UniversityOfOregon/"
 
 #--------------------------------------------------------------------------------
 #Download county boundaries as a reference point
@@ -118,7 +120,7 @@ Henrico_Zoning <- read_sf(paste0(onedrivepath, "Zoning data/Richmond MSA/Henrico
 
 
 #Load zoning description
-RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RQ3/RVA-Zoning-Descriptions.xlsx")
+RVA_Zoning_Descriptions <- read_excel("~/Library/CloudStorage/OneDrive-UniversityOfOregon/Dissertation Research/RQ3/RVA-Zoning-Descriptions.xlsx")
 
 #Join descriptions with code
 Henrico_Zoning <- Henrico_Zoning %>%
