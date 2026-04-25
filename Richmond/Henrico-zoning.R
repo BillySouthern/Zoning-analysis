@@ -1377,7 +1377,7 @@ Zoning_Parcels_Affluent_Median <- Zoning_Parcels_Income %>%
   filter(!Affluent_Group %in% c(FALSE))
   
 
-#Adjust hosue value figures 
+#Adjust house value figures 
 Zoning_Parcels_Incom_Median <- Zoning_Parcels_Income %>%
   mutate(`SALE YEAR` = as.numeric(substr(`SALE DATE`, 1, 4))) %>%
   filter(!`ZONING CODE` %in% c("RMH", "RMP")) %>%
@@ -1409,12 +1409,96 @@ Zoning_Parcels_Incom_Median <- Zoning_Parcels_Incom_Median %>%
            # `ZONING CODE`, 
            # Lot_Size,
            Zoning_Group_Acre
+  ) %>%
+  summarise(
+    p10 = quantile(Median_Unit_Value_Inf, 0.10, na.rm = TRUE),
+    p25 = quantile(Median_Unit_Value_Inf, 0.25, na.rm = TRUE),
+    Median_Unit_Value = quantile(Median_Unit_Value_Inf, 0.50, na.rm = TRUE), # median
+    p75 = quantile(Median_Unit_Value_Inf, 0.75, na.rm = TRUE),
+    p90 = quantile(Median_Unit_Value_Inf, 0.90, na.rm = TRUE),
+    .groups = "drop"
   ) %>% 
-  summarise(Median_Unit_Value = median(Median_Unit_Value_Inf, na.rm = TRUE)) %>%
+  # summarise(Median_Unit_Value = median(Median_Unit_Value_Inf, na.rm = TRUE)) %>%
   ungroup() %>%
   filter(`Median_Unit_Value` <= 1500000)  
 
-# need to add 'just affluent areas' to the chart as a separate thing (for comparison)
+#Rebase to 1980
+Zoning_Parcels_Rebased <- Zoning_Parcels_Incom_Median %>%
+  group_by(`Facet`, Zoning_Group_Acre) %>%
+  mutate(
+    base_1980 = Median_Unit_Value[`SALE YEAR` == 1980][1]
+  ) %>%
+  ungroup() %>%
+  mutate(
+    p10_idx = (p10 / base_1980) * 100,
+    p25_idx = (p25 / base_1980) * 100,
+    p50_idx = (Median_Unit_Value / base_1980) * 100,
+    p75_idx = (p75 / base_1980) * 100,
+    p90_idx = (p90 / base_1980) * 100
+  )
+
+#Geom_Ribbon plotting
+Zoning_Parcels_Rebased %>%
+  ggplot(aes(x = `SALE YEAR`,
+             color = `Facet`,
+             fill = `Facet`,
+             group = `Facet`)) +
+  geom_ribbon(aes(ymin = p25_idx, ymax = p75_idx),
+              alpha = 0.4,
+              color = NA) +
+  # geom_ribbon(aes(ymin = p10_idx, ymax = p90_idx),
+  #             alpha = 0.2,
+  #             color = NA) +
+  geom_line(aes(y = p50_idx), size = 1) +
+  facet_grid(fct_rev(`Zoning_Group_Acre`) ~ .,
+             space = "free",
+             switch = "y") +
+  geom_vline(xintercept = 1960, color = "black", size = 0.75) +
+  geom_vline(xintercept = 2021, color = "black", size = 0.75) +
+  theme_minimal() +
+  scale_y_continuous(name = "Indexed parcel value (1980 = 100)",
+    breaks = c(50, 100, 150, 200, 250, 300, 350),
+    position = "right") +
+  scale_color_manual(values = c("Areas not concentrated affluence" = "grey",
+                                "Concentrated affluence" = "#7f3b08"), guide = "none") +
+  scale_fill_manual(values = c("Areas not concentrated affluence" = "grey",
+                               "Concentrated affluence" = "#7f3b08"), guide = "none") +
+  labs(
+    # title = "Henrico County",
+    subtitle = "Indexed parcel values (1980 = 100) across areas of<br>
+    <span style='color:#7f3b08;'>concentrated affluence</span> and 
+    <span style='color:darkgrey;'>not concentrated affluence</span>",
+    x = NULL,
+    caption = "Ribbon shows interquartile range; values adjusted to 2022 dollars") +
+  labs(
+    # title = "Henrico County",
+       subtitle = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
+       #subtitle = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span>, <span style='color:#8da0cb;'>affluent but not concentrated</span>, and <span style='color:darkgrey;'>not concentrated or affluent</span>",
+       x = NULL,
+       y = "Median parcel sale value",
+       caption = "All values are inflation-adjusted to 2022 dollars and indexed to 1980 = 100.
+       Shaded ribbons describe interquartile range (25th–75th percentile)"
+  ) +
+  # scale_y_continuous(labels = label_dollar(),
+  #                    breaks = c(0, 250000, 500000, 750000, 1000000, 1250000, 1500000),
+  #                    position = "right") +
+  scale_x_continuous(breaks = c(1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020)) +
+  coord_cartesian(xlim=c(1980, 2020)) +
+  theme(plot.subtitle = element_markdown(hjust = 0.5, size = 13, face = "bold"),
+        strip.placement = "outside",
+        strip.text.y = element_markdown(size = 12, face = "bold"), 
+        axis.text.x = element_text(size = 11, hjust = 0.5, vjust = 0.825),
+        axis.text.y = element_markdown(size = 12),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        legend.position = "right",
+        axis.title.x = element_blank(),
+        axis.title.y = element_markdown(size = 14),
+        panel.grid.major.x = element_line(size = 0.2, color = "darkgrey"),
+        panel.grid.minor.x = element_line(size = 0.2, color = "lightgrey"),
+        panel.grid.major.y = element_line(size = 0.2, color = "grey"),
+        panel.grid.minor.y = element_line(size = 0, color = "lightgrey"),
+        panel.border = element_rect(color = "black", fill = NA, size = 0.75)) 
+
 
 #Plot
 Zoning_Parcels_Incom_Median %>%
@@ -1535,7 +1619,7 @@ Zoning_Parcels_Income_Ridges <- Zoning_Parcels_Income %>%
   mutate(`SALE YEAR` = as.numeric(substr(`SALE DATE`, 1, 4))) %>%
   mutate(Median_Unit_Value_Inf = adjust_for_inflation(`SALE AMOUNT`, 
                                                       `SALE YEAR`, "US", to_date = 2022)) %>%
-  filter(!str_detect(PIN, OUTLIERS)) %>%
+  # filter(!str_detect(PIN, OUTLIERS)) %>%
   filter(!`ZONING CODE` %in% c("RMH", "RMP")) %>%
   filter(!Zoning_Group_Acre %in% c("Agricultural")) 
   
@@ -1594,7 +1678,7 @@ Zoning_Parcels_Income_Ridges %>%
   ) +
   coord_cartesian(xlim=c(50000, 1750000)) 
   
-ggsave("Ridges_Sales_Values.png",
+ggsave("Ridges_Sales_Values_Zoning_Size.png",
        path = "~/desktop",
        width = 9,
        height = 8,
@@ -1665,6 +1749,102 @@ Table_Descriptives <- Zoning_Parcels_Income_Ridges %>%
     Mean_Acres = round(mean(ACRES, na.rm = TRUE), 2),
     Median_Acres = round(median(ACRES, na.rm = TRUE), 2),
     Median_Coverage = round(median(`TOTAL SQUARE FOOTAGE ALL BUILDINGS` / `LAND SQUARE FOOTAGE` * 100, na.rm = TRUE), 2)
+  )
+
+#Reworking descriptives
+# Step 1: Summarise from raw data (don't overwrite Test)
+summary_df <- Zoning_Parcels_Income_Ridges %>%
+  clean_names() %>%
+  group_by(zoning_group_acre, facet) %>%
+  summarise(
+    n = n(),
+    mean_acres = mean(acres, na.rm = TRUE),
+    median_acres = median(acres, na.rm = TRUE),
+    share_built_after_2000 = mean(year_built >= 2000, na.rm = TRUE) * 100,
+    median_year_built = median(year_built, na.rm = TRUE),
+    share_sold_last_10 = mean(sale_year >= 2014, na.rm = TRUE) * 100,
+    median_sale_year = median(sale_year, na.rm = TRUE),
+    median_lot_coverage = median(far, na.rm = TRUE) * 100,
+    .groups = "drop"
+  )
+
+# Step 2: Pivot long
+summary_long <- summary_df %>%
+  pivot_longer(
+    cols = c(mean_acres, median_acres, share_built_after_2000,
+             median_year_built, share_sold_last_10, median_sale_year,
+             median_lot_coverage),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(metric = recode(metric,
+                         "mean_acres"             = "Mean Acres",
+                         "median_acres"           = "Median Acres",
+                         "share_built_after_2000" = "% Built After 2000",
+                         "median_year_built"      = "Median Year Built",
+                         "share_sold_last_10"     = "% Sold Last 10 Yrs",
+                         "median_sale_year"       = "Median Sale Year",
+                         "median_lot_coverage"    = "Median Lot Coverage"
+  ))
+
+# Step 3: Dumbbell Plot
+summary_long %>%
+  pivot_wider(names_from = facet, values_from = value) %>%
+  clean_names() %>%
+  # rename(non_concentrated_affluence = `non_concentrated_affluence`) %>%  
+  # if still broken, force it:
+  setNames(make.names(names(.), unique = TRUE)) %>%
+  rename(
+    con = concentrated_affluence,
+    non_con = `Non.concentrated.affluence`
+  ) %>%
+  ggplot(aes(y = metric)) +
+  geom_segment(aes(
+    x = non_con,
+    xend = con,
+    yend = metric
+  ), color = "grey60", linewidth = 1) +
+  geom_point(aes(x = con), color = "#7f3b08", size = 3) +
+  geom_point(aes(x = non_con), color = "grey40", size = 3) +
+  facet_grid(fct_rev(zoning_group_acre) ~ ., scales = "free_x", switch = "y") +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Parcel characteristics by affluence concentration",
+    subtitle = "<span style='color:#7f3b08;'>Concentrated affluence</span> vs <span style='color:grey40;'>Non-concentrated affluence</span>",
+    x = NULL, y = NULL
+  ) +
+  theme(
+    plot.subtitle = element_markdown(size = 12),
+    strip.placement = "outside",
+    strip.text.y = element_markdown(size = 11, face = "bold"),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.75),
+    panel.grid.major.y = element_line(color = "grey90")
+  )
+
+# Step 4: Heatmap
+summary_long %>%
+  group_by(metric) %>%
+  mutate(scaled = scale(value)[, 1]) %>%
+  ungroup() %>%
+  mutate(group_label = paste0(zoning_group_acre, "\n", facet)) %>%
+  ggplot(aes(x = group_label, y = metric, fill = scaled)) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  geom_text(aes(label = round(value, 1)), size = 3, color = "black") +
+  scale_fill_gradient2(
+    low = "grey90", mid = "white", high = "#7f3b08",
+    midpoint = 0, name = "Scaled value"
+  ) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Parcel characteristics heatmap",
+    subtitle = "Values normalized within each metric row",
+    x = NULL, y = NULL
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 35, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 11),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold", size = 16)
   )
 
 #-------------------------------------------------------------------------------
@@ -1992,3 +2172,66 @@ tmap_save(
   width = 7,
   dpi = 500
 )
+
+#------------------------------------------------------------------------------
+#Floor Area work
+#Calculate FAR
+Zoning_Parcels_Income <- Zoning_Parcels_Income %>%
+  mutate(
+    ACRES = as.numeric(ACRES),
+    `TOTAL SQUARE FOOTAGE ALL BUILDINGS` = as.numeric(`TOTAL SQUARE FOOTAGE ALL BUILDINGS`),
+    FAR = `TOTAL SQUARE FOOTAGE ALL BUILDINGS` / (ACRES * 43560)
+  ) %>%
+  filter(
+    ACRES > 0,
+    ACRES <= 14000,
+    is.finite(FAR),
+    FAR < 5
+  )
+
+#Box plot with points
+ggplot(Zoning_Parcels_Income, aes(x = Facet, y = FAR, fill = Facet)) +
+  geom_sina(aes(fill = Facet, col = Facet), alpha = 0.4, size = 1, shape = 21) +
+  geom_boxplot(fill = NA, color = "black") +
+  facet_grid(fct_rev(Zoning_Group_Acre) ~ .,
+             space = "free",
+             switch = "y", scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  scale_fill_manual(values = c("Concentrated affluence" = "#7f3b08",
+                               "Non-concentrated affluence" = "grey"),
+                    name = NULL, guide = "none") +
+  scale_color_manual(values = c("Concentrated affluence" = "#7f3b08",
+                               "Non-concentrated affluence" = "grey"),
+                    name = NULL, guide = "none") +
+  coord_cartesian(ylim = c(0, 1.96)) +
+  labs(
+    subtitle = "Floor area ratio across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
+    y = NULL,
+    x = NULL,
+    caption = "FAR measures building square footage relative to lot size (density of development)."
+  ) +
+  theme(
+    plot.subtitle = element_markdown(hjust = 0.5, size = 13, face = "bold"),
+    plot.caption = element_markdown(size = 9),
+    strip.placement = "outside",
+    strip.text.y = element_markdown(size = 12, face = "bold"),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 11, hjust = 0.75, vjust = 0.825),
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+    legend.position = "right",
+    axis.title.x = element_blank(),
+    axis.title.y = element_markdown(size = 14),
+    panel.grid.major.x = element_line(size = 0.2, color = "darkgrey"),
+    panel.grid.minor.x = element_line(size = 0.2, color = "lightgrey"),
+    panel.grid.major.y = element_line(size = 0.2, color = "grey"),
+    panel.grid.minor.y = element_line(size = 0.1),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.75))
+
+#To save
+ggsave("FAR.png",
+       path = "~/desktop",
+       width = 7,
+       height = 10,
+       units = "in",
+       dpi = 500)
+
