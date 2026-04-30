@@ -17,12 +17,16 @@ library(ggtext)
 library(ggridges)
 library(data.table)
 library(ggforce)
+library(patchwork)
 
   #For income seg work
 library(haven)
 library(RStata)
 library(spdep) #For spatial analyses
 library(priceR)
+library(binsmooth) #For binned calculations
+library(pracma) #For mathematical functions
+
 
 options(tigris_use_cache = TRUE)
 
@@ -2647,3 +2651,507 @@ ggsave("FAR_L.png",
        units = "in",
        dpi = 500)
 
+#-------------------------------------------------------------------------------
+#Distinguishing CA from non-CA
+Henrico_Income_Bins <- get_acs(
+  geography = "block group",
+  state = "VA",
+  county = "Henrico",
+  year = 2022,
+  survey = "acs5",
+  variables = c(
+    Less_than_10000 = "B19001_002",
+    Between_10000_and_14999 = "B19001_003",
+    Between_15000_and_19999 = "B19001_004",
+    Between_20000_and_24999 = "B19001_005",
+    Between_25000_and_29999 = "B19001_006",
+    Between_30000_and_34999 = "B19001_007",
+    Between_35000_and_39999 = "B19001_008",
+    Between_40000_and_44999 = "B19001_009",
+    Between_45000_and_49999 = "B19001_010",
+    Between_50000_and_59999 = "B19001_011",
+    Between_60000_and_74999 = "B19001_012",
+    Between_75000_and_99999 = "B19001_013",
+    Between_100000_and_124999 = "B19001_014",
+    Between_125000_and_149999 = "B19001_015",
+    Between_150000_and_199999 = "B19001_016",
+    Above_200000 = "B19001_017"
+  ),
+  output = "wide"
+) %>%
+  select(GEOID, NAME, ends_with("E")) %>%
+  pivot_longer(
+    cols = -c(GEOID, NAME),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  mutate(
+    variable_base = str_remove(variable, "_E$")  # THIS is correct for wide ACS output
+  )
+
+Henrico_Income_Bins <- Henrico_Income_Bins %>%
+  mutate(income_bin_25k = case_when(
+    variable_base %in% c(
+      "Less_than_10000E",
+      "Between_10000_and_14999E",
+      "Between_15000_and_19999E",
+      "Between_20000_and_24999E") ~ "<$25k",
+    variable_base %in% c(
+      "Between_25000_and_29999E",
+      "Between_30000_and_34999E",
+      "Between_35000_and_39999E",
+      "Between_40000_and_44999E",
+      "Between_45000_and_49999E") ~ "$25k–$49k",
+    variable_base %in% c(
+      "Between_50000_and_59999E",
+      "Between_60000_and_74999E") ~ "$50k–$74k",
+    variable_base %in% c(
+      "Between_75000_and_99999E",
+      "Between_100000_and_124999E") ~ "$75k–$124k",
+    variable_base %in% c(
+      "Between_125000_and_149999E",
+      "Between_150000_and_199999E") ~ "$125k–$199k",
+    variable_base == "Above_200000E" ~ "$200k+"
+  )) %>%
+  left_join(Income_LISA_Henrico, by = "GEOID") %>%
+  # st_drop_geometry() %>%
+  select(GEOID, NAME, variable, value, variable_base, income_bin_25k, Local_M_i, Facet) %>%
+  mutate(income_bin_25k = factor(
+      income_bin_25k,
+      levels = c(
+        "<$25k",
+        "$25k–$49k",
+        "$50k–$74k",
+        "$75k–$124k",
+        "$125k–$199k",
+        "$200k+"),
+      ordered = TRUE))
+
+
+#Shares by geoid
+Henrico_Income_25k <- Henrico_Income_Bins %>%
+  filter(!is.na(Facet)) %>%
+  group_by(Facet, income_bin_25k) %>%
+  summarise(value = sum(value), .groups = "drop") %>%
+  group_by(Facet) %>%
+  mutate(share = value / sum(value)) %>%
+  ungroup() %>%
+  mutate(
+    Facet = factor(
+      Facet,
+      levels = c("Non-concentrated affluence", "Concentrated affluence")))
+
+#Difference plot
+diff_plot <- Henrico_Income_25k %>%
+  select(Facet, income_bin_25k, share) %>%
+  pivot_wider(
+    names_from = Facet,
+    values_from = share
+  ) %>%
+  mutate(
+    diff = `Concentrated affluence` - `Non-concentrated affluence`
+  )
+
+
+#Bar plot
+y_lim <- max(abs(diff_plot$diff), Henrico_Income_25k$share, na.rm = TRUE)
+limits = c(-y_lim, y_lim)
+
+#Ginis
+#CA - 0.3649978
+#Non CA - 0.3997593
+
+p_bars <- ggplot(Henrico_Income_25k,
+                 aes(x = income_bin_25k, y = share, fill = Facet, alp)) +
+  geom_col(position = position_dodge(width = 0.6), width = 0.8) +
+  theme_minimal(base_size = 14) +
+  scale_fill_manual(values = c(
+    "Concentrated affluence" = "#7f3b08",
+    "Non-concentrated affluence" = "grey"
+  ),
+  labels = c(
+    "Concentrated affluence
+    (Gini = 0.36)",
+    "Non-concentrated affluence
+    (Gini = 0.40)"
+  ),
+  name = NULL
+  ) +
+  coord_cartesian(ylim = c(0, 0.45)) +
+  theme(
+    plot.subtitle = element_markdown(hjust = 0.5, size = 13, face = "bold"),
+    plot.caption  = element_markdown(size = 9),
+    # axis.text.x   = element_blank(),
+    plot.margin   = margin(t = -10),  
+    # panel.border  = element_rect(color = "black", fill = NA, size = 0.75)
+  ) +
+  scale_y_continuous(
+    labels = scales::label_percent(),
+    limits = c(-y_lim, y_lim)) +
+  labs(
+    # subtitle = "Household Income Distributions across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
+    y = "Share of Households",
+    x = NULL,
+    # caption = "FAR measures building square footage relative to lot size (density of development)."
+  ) 
+  
+#Difference plot (assuming you already computed diff column)
+p_diff <- diff_plot %>%
+  # group_by(income_bin_25k) %>%
+  # summarise(diff = diff(share)[1]) %>%  # adjust depending on structure
+  ggplot(aes(x = income_bin_25k, y = diff)) +
+  geom_col(fill = "black") +
+  geom_hline(yintercept = 0, linetype = "solid") +
+  coord_cartesian(ylim = c(-0.2, 0.2)) +  # adjust as needed
+  theme_minimal(base_size = 14) +
+  labs(
+    subtitle = "Distribution of household incomes across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
+    y = "Share difference (CA vs non-CA)",
+    x = NULL,
+    # caption = "FAR measures building square footage relative to lot size (density of development)."
+  ) +
+  theme(
+    plot.subtitle = element_markdown(hjust = 0.5, size = 13, face = "bold"),
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank(),
+    # axis.title.y = element_blank(),
+    plot.margin  = margin(b = -10),   
+    panel.grid.minor = element_blank()
+  ) +
+    scale_y_continuous(
+      labels = scales::label_percent())
+
+#Combine here
+p_diff / p_bars
+
+#To save
+ggsave("Income_Differences.png",
+       path = "~/desktop",
+       width = 9.5,
+       height = 8,
+       units = "in",
+       dpi = 500)
+
+
+
+
+#Geom col
+ggplot(diff_plot,
+       aes(x = income_bin_25k, y = share, fill = Facet)) +
+  geom_col(
+    position = position_dodge(width = 0.6),
+    width = 0.8
+  ) +  
+  labs(
+    x = "Income bin",
+    y = "Share of households",
+    fill = NULL,
+    title = "Income Distribution Comparison (Offset Bars)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+#stacked bar chart
+ggplot(diff_plot,
+       aes(x = income_bin_25k, y = share, fill = Facet)) +
+  geom_col(position = "identity", alpha = 0.45) +
+  labs(
+    x = "Income bin",
+    y = "Share of households",
+    fill = NULL,
+    title = "Income Distribution Shape: Concentrated vs Non-Concentrated Areas"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Side by side bar chart
+ggplot(diff_plot,
+       aes(x = income_bin_25k, y = share, fill = Facet)) +
+  geom_col(position = "dodge") +
+  labs(
+    x = "Income bin",
+    y = "Share of households",
+    fill = NULL,
+    title = "Income Distribution Comparison Across Concentration Types"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Line chart
+ggplot(diff_plot,
+       aes(x = income_bin_25k, y = share, color = Facet, group = Facet)) +
+  geom_line(size = 1.2) +
+  geom_point() +
+  labs(
+    x = "Income bin",
+    y = "Share of households",
+    color = NULL,
+    title = "Income Distribution Skewness by Concentration Status"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+ggplot(diff_plot,
+       aes(x = income_bin_25k, y = diff)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    x = "Income bin",
+    y = "Difference in share (Concentrated - Non-Concentrated)",
+    title = "Income Composition Differences by Concentration Status"
+  ) +
+  theme_minimal()
+
+#Cumulative dist
+df_cdf <- diff_plot %>%
+  arrange(Facet, income_bin_25k) %>%
+  group_by(Facet) %>%
+  mutate(cum_share = cumsum(share))
+
+ggplot(df_cdf,
+       aes(x = income_bin_25k, y = cum_share, color = Facet, group = Facet)) +
+  geom_line(size = 1.2) +
+  labs(
+    x = "Income bin",
+    y = "Cumulative share",
+    title = "Income Distribution Cumulative Structure"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+#Calculating Gini of each landscape
+
+#Create bin boundaries for the function below
+#Remove NAs/0 as function fails on NAs and 0 values
+Henrico_Gini <- Henrico_Income_Bins %>%
+  # group_by(Facet) %>%         #Group here to test on the entire geography rather than subunit (MSA vs tract)
+  # summarise(Count = sum(value)) %>%
+  mutate(
+    lower_limit = case_when(
+      variable == "Less_than_10000E" ~ 0,
+      variable == "Between_10000_and_14999E" ~ 10000,
+      variable == "Between_15000_and_19999E" ~ 15000,
+      variable == "Between_20000_and_24999E" ~ 20000,
+      variable == "Between_25000_and_29999E" ~ 25000,
+      variable == "Between_30000_and_34999E" ~ 30000,
+      variable == "Between_35000_and_39999E" ~ 35000,
+      variable == "Between_40000_and_44999E" ~ 40000,
+      variable == "Between_45000_and_49999E" ~ 45000,
+      variable == "Between_50000_and_59999E" ~ 50000,
+      variable == "Between_60000_and_74999E" ~ 60000,
+      variable == "Between_75000_and_99999E" ~ 75000,
+      variable == "Between_100000_and_124999E" ~ 100000,
+      variable == "Between_125000_and_149999E" ~ 125000,
+      variable == "Between_150000_and_199999E" ~ 150000,
+      variable == "Above_200000E" ~ 200000,
+      TRUE ~ NA_real_
+    ),
+    upper_limit = case_when(
+      variable == "Less_than_10000E" ~ 9999,
+      variable == "Between_10000_and_14999E" ~ 14999,
+      variable == "Between_15000_and_19999E" ~ 19999,
+      variable == "Between_20000_and_24999E" ~ 24999,
+      variable == "Between_25000_and_29999E" ~ 29999,
+      variable == "Between_30000_and_34999E" ~ 34999,
+      variable == "Between_35000_and_39999E" ~ 39999,
+      variable == "Between_40000_and_44999E" ~ 44999,
+      variable == "Between_45000_and_49999E" ~ 49999,
+      variable == "Between_50000_and_59999E" ~ 59999,
+      variable == "Between_60000_and_74999E" ~ 74999,
+      variable == "Between_75000_and_99999E" ~ 99999,
+      variable == "Between_100000_and_124999E" ~ 124999,
+      variable == "Between_125000_and_149999E" ~ 149999,
+      variable == "Between_150000_and_199999E" ~ 199999,
+      variable == "Above_200000E" ~ 10000000,
+      TRUE ~ NA_real_
+    )) %>%
+  arrange( #Data must be in order for function
+    lower_limit 
+  ) %>%
+  filter(!is.na(Facet))
+
+#Filter
+Henrico_CA_Gini <- Henrico_Gini %>%
+  filter(Facet == "Non-concentrated affluence")
+
+
+#STEP BINS APPROACH
+# Create object and parameters
+binedges <- Henrico_CA_Gini$upper_limit
+bincounts <- Henrico_CA_Gini$value
+
+# Use stepbins to calculate stepbin statistics
+sb <- stepbins(binedges, bincounts,
+               tailShape = c("onebin"))
+
+# Mean of stepbins
+mean_income <- integral(function(x){1-sb$stepCDF(x)}, 0, sb$E)
+
+# Median of stepbins
+median_income <- uniroot(function(x) sb$stepCDF(x) - 0.5, lower = 0, upper = sb$E)$root
+
+# Calculate general statistics (variance, SD, Theils, Gini)
+stats <- stats_from_distribution(sb)
+
+# Extract statistics values
+variance_val <- unname(stats["variance"])
+sd_val <- unname(stats["SD"])
+theils_val <- unname(stats["Theil"])
+gini_val <- unname(stats["Gini"])
+
+# Create a data frame with the results
+Henrico_Stepbins_2020 <- data.frame(
+  Median_Income = median_income,
+  Mean_Income = mean_income,
+  Variance = variance_val,
+  SD = sd_val,
+  Theils = theils_val,
+  Gini = gini_val
+) 
+
+#CA - 0.6263187
+#Non CA - 0.8477195
+
+#Gini from ACS
+  #New tract conc
+
+
+#Download block level data
+#2020 Median HH income 
+Henrico_Income_2022 <- get_acs(
+  geography = "tract", 
+  variables = "B19013_001", 
+  state = ST,
+  year = YR4,
+  output = "wide",
+  geometry = T) %>%
+  filter(str_detect(GEOID, "51087")) %>%
+  rename("Income_2022" = B19013_001E,
+         "IncomeMOE_2022" = B19013_001M) %>%
+  select(-NAME)
+
+#Exploratory map of Henrico LISA
+tmap_mode("view")  
+
+tm_shape(Henrico_Income_2022) +
+  tm_polygons(
+    col = "Income_2022",     
+    # palette = c("red", "grey70", "green"),  
+    alpha = 0.7,
+    border.col = "black"
+  ) +
+  tm_basemap("OpenStreetMap")  
+
+#Rerun LISA on just Henrico County tracts (as a test measure)
+#Create dataframe
+Income_LISA <- Henrico_Income_2022 %>%
+  filter(!Income_2022 == "NA") %>%
+  mutate(scaled_estimate = as.numeric(scale(Income_2022))) 
+
+# Income_LISA$scaled_estimate <- as.numeric(scale(Income_LISA$Med_Income_Adj))
+
+#Create spatial neighbors object
+neighbors <- poly2nb(Income_LISA$geometry, queen = TRUE)
+summary(neighbors)
+
+# Ensure your data is an sf object
+Income_LISA <- st_as_sf(Income_LISA) 
+
+# Calculate centroids and extract coordinates
+Income_LISA_coords <- Income_LISA %>%
+  st_centroid() %>%
+  st_coordinates()
+
+#Create weights 
+weights <- nb2listw(neighbors, style = "W")
+
+#Isolate weights
+weights$weights[[1]]
+
+#Run LISA
+Income_LISA_Results <- localmoran_perm(
+  Income_LISA$scaled_estimate, 
+  weights, 
+  nsim = 999L, 
+  alternative = "two.sided"
+) %>%
+  as_tibble() %>%
+  set_names(c("Local_M_i", "Expected_i", "Variance_i", "Z_i", "Pval_i",
+              "Pval_i_sim", "Pvali_sim_folded", "Skewness", "Kurtosis"))
+
+#Join LISA with income data
+Income_LISA <- Income_LISA %>%
+  select(GEOID, Income_2022, scaled_estimate) %>%
+  mutate(lagged_estimate = lag.listw(weights, scaled_estimate)) %>%
+  bind_cols(Income_LISA_Results) 
+
+#Recreate string
+Income_LISA$Local_M_i <- as.numeric(Income_LISA$Local_M_i)
+
+#Set the clusters
+Income_LISA_Henrico <- Income_LISA %>%
+  mutate(lisa_cluster = case_when(
+    Pval_i >= 0.05 ~ "Not significant",
+    scaled_estimate > 0 & Local_M_i > 0 ~ "High-high", #High income, high-income neighbors
+    scaled_estimate > 0 & Local_M_i < 0 ~ "High-low", #High income, low-income neighbors
+    scaled_estimate < 0 & Local_M_i > 0 ~ "Low-low", #Low income, low-income neighbors
+    scaled_estimate < 0 & Local_M_i < 0 ~ "Low-high" #Low income, high-income neighbors
+  )) %>%
+  mutate(Tract_type = case_when(
+    Income_2022 >= 138750 ~ "Affluent tract",
+    Income_2022 <= 27750 ~ "Poor tract",
+  )) %>%
+  mutate(Concentrations = case_when(
+    Pval_i >= 0.05 ~ "Not significant",
+    Income_2022 > 27750 & Income_2022 <= 138750 & Local_M_i < 0 ~ "Not significant",  # Middle income
+    Income_2022 > 27750 & Income_2022 <= 138750 & Local_M_i > 0 ~ "Middle income clustered",  # Middle income
+    Income_2022 >= 138750 & Local_M_i < 0 ~ "High-none", #High income, not concentrated
+    Income_2022 >= 138750 & Local_M_i > 0 ~ "High-high", #High income, highly concentrated
+    Income_2022 <= 27750 & Local_M_i > 0 ~ "Low-high", #Low income, highly concentrated
+    Income_2022 <= 27750 & Local_M_i < 0 ~ "Low-none" #Low income, not concentrated
+  )) %>%
+  mutate(Facet = if_else(Concentrations == "High-high",
+                         "Concentrated affluence",
+                         "Non-concentrated affluence")) %>%
+  select(GEOID, Income_2022, scaled_estimate, Local_M_i, Facet, geometry)
+
+
+#Gini at tract level
+Henrico_Gini_ACS <- get_acs(
+  geography = "tract",
+  state = "VA",
+  county = "Henrico",
+  year = 2022,
+  survey = "acs5",
+  table = "B19083",
+  geometry = FALSE
+)
+
+#Population at tract level
+pop_tract <- get_acs(
+  geography = "tract",
+  state = "VA",
+  county = "Henrico",
+  year = 2022,
+  survey = "acs5",
+  variables = c(pop = "B01003_001"),
+  geometry = FALSE
+)
+
+#Join + LISA data
+Henrico_Gini_ACS <- Henrico_Gini_ACS %>%
+  select(GEOID, gini = estimate) %>%
+  left_join(pop_tract %>% select(GEOID, pop = estimate), by = "GEOID") %>%
+  left_join(Income_LISA_Henrico, by = "GEOID") %>%
+  group_by(Facet) %>%
+  summarise(
+    gini_weighted = sum(gini * pop, na.rm = TRUE) / sum(pop, na.rm = TRUE),
+    total_pop = sum(pop, na.rm = TRUE),
+    n_tracts = n()
+  )  
