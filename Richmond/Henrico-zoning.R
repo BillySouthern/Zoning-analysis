@@ -1468,7 +1468,7 @@ Zoning_Parcels_Income <- st_join(Henrico_Zoning_parcels, Income_LISA_Henrico[, c
   #     ACRES > 0   & ACRES <= 0.25  ~ "Small lot zoned parcels",
   #     ACRES > 0.25 & ACRES <= 0.5     ~ "Medium lot zoned parcels",
   #     ACRES > 0.5                    ~ "Large lot zoned parcels",
-  #     TRUE                         ~ NA_character_)) 
+  #     TRUE                         ~ NA_character_))
   # mutate(
   #   Zoning_Group_Acre = case_when(
   #     `ZONING CODE` %in% c("A-1", "AR-1", "AR-2", "AR-6") ~ "Agricultural",
@@ -1476,7 +1476,7 @@ Zoning_Parcels_Income <- st_join(Henrico_Zoning_parcels, Income_LISA_Henrico[, c
   #     `ZONING CODE` %in% c("R-2", "R-2C", "R-2A", "R-2AC", "R-3AC", "R-3C", "R-3", "R-3A") ~ "Medium lot zoned parcels",
   #     `ZONING CODE` %in% c("R-5", "R-5A", "R-5AC", "R-5C", "R-6", "R-6C", "RTH", "RTHC", "RMP", "R-4", "R-4A", "R-4AC", "RM", "RS") ~ "Small lot zoned parcels",
   #     TRUE ~ NA_character_  ))
-  mutate(
+   mutate(
     Zoning_Group_Acre = case_when(
       `ZONING CODE` %in% c("A-1", "AR-1", "AR-2", "AR-6") ~ "Agricultural",
       `ZONING CODE` %in% c("R-0", "RC") ~ "Large lot zoned parcels",
@@ -1485,7 +1485,7 @@ Zoning_Parcels_Income <- st_join(Henrico_Zoning_parcels, Income_LISA_Henrico[, c
         ACRES > 1 ~ "Large lot zoned parcels",
       `ZONING CODE` %in% c("R-2", "R-2C", "R-2A", "R-2AC", "R-3AC", "R-3C", "R-3", "R-3A") &
         ACRES <= 1 ~ "Medium lot zoned parcels",
-      `ZONING CODE` %in% c("R-5", "R-5A", "R-5AC", "R-5C", "R-6", "R-6C", "RTH", "RTHC", 
+      `ZONING CODE` %in% c("R-5", "R-5A", "R-5AC", "R-5C", "R-6", "R-6C", "RTH", "RTHC",
                            "RMP", "R-4", "R-4A", "R-4AC", "RM", "RS") ~ "Small lot zoned parcels",
       TRUE ~ NA_character_ ))
   # mutate(
@@ -1912,6 +1912,7 @@ Zoning_Parcels_Income_Ridges %>%
         panel.border = element_rect(color = "black", fill = NA, size = 0.75)
   ) +
   coord_cartesian(xlim=c(50000, 1750000)) 
+
   
 ggsave("Ridges_Sales_Values_Zoning_Size.png",
        path = "~/desktop",
@@ -1919,6 +1920,66 @@ ggsave("Ridges_Sales_Values_Zoning_Size.png",
        height = 8,
        units = "in",
        dpi = 500)
+
+#Tidy for facet plots of above
+Facet_Plottng <- Zoning_Parcels_Income_Ridges %>%
+  select(PIN, ACRES, `YEAR BUILT`, `SALE YEAR`, Facet, Zoning_Group_Acre) %>%
+  st_drop_geometry() %>%
+  rename("Acres" = ACRES,
+    "Year Built" = `YEAR BUILT`,
+    "Most Recent Sale Year" = `SALE YEAR`
+  ) %>%
+  pivot_longer(cols = c("Year Built", "Most Recent Sale Year", Acres),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+mutate(value = case_when(
+    variable == "Acres" ~ pmin(pmax(value, 0), 14),
+    variable == "Year Built" ~ pmin(pmax(value, 1930), 2020),
+    variable == "Most Recent Sale Year" ~ pmin(pmax(value, 1930), 2020),
+    TRUE ~ value))
+
+#Plot facet
+Facet_Plottng %>%
+  filter(!`Zoning_Group_Acre` %in% c("Very Large lot zoned parcels")) %>%
+  filter(!is.na(value)) %>%
+  ggplot(aes(x = value, y = Facet)) +
+  geom_density_ridges(aes(fill = Facet), quantile_lines = TRUE,
+    quantiles = 2, scale = 0.8, rel_min_height = 0.001,   
+    color = "black", alpha = 0.9) +
+  facet_grid(`Zoning_Group_Acre` ~ variable, scales = "free", switch = "y") +
+  scale_fill_manual(values = c(
+      "Concentrated affluence" = "#7f3b08",
+      "Non-concentrated affluence" = "grey"
+    ),
+    guide = "none") +
+  scale_x_continuous() +
+  labs(
+    title = "Distributions of Parcel Characteristics by Zoning Group and Affluence",
+    x = NULL,
+    y = NULL) +
+  coord_cartesian() +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.text.y = element_text(angle = 0),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text.y = element_text(face = "bold", size = 12),
+    strip.text.x = element_text(face = "bold", size = 12),
+    strip.placement = "outside",
+    panel.spacing = unit(1, "lines"),
+    panel.grid.major.x = element_line(color = "grey80", size = 0.2),
+    panel.grid.minor = element_line(color = "grey90", size = 0.1),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.7)
+  )
+
+ggsave("Parcel_Char_Facet.png",
+       path = "~/desktop",
+       width = 11,
+       height = 9,
+       units = "in",
+       dpi = 500)
+
 
 #--------------------------------------------------------------------------------
 #Descriptive for the table
@@ -2762,18 +2823,30 @@ limits = c(-y_lim, y_lim)
 #Non CA - 0.3997593
 
 p_bars <- ggplot(Henrico_Income_25k,
-                 aes(x = income_bin_25k, y = share, fill = Facet, alp)) +
+                 aes(x = income_bin_25k, y = share, fill = Facet, alpha = Facet)) +
   geom_col(position = position_dodge(width = 0.6), width = 0.8) +
   theme_minimal(base_size = 14) +
   scale_fill_manual(values = c(
-    "Concentrated affluence" = "#7f3b08",
-    "Non-concentrated affluence" = "grey"
+    "Non-concentrated affluence" = "grey",
+    "Concentrated affluence" = "#7f3b08"
   ),
   labels = c(
-    "Concentrated affluence
-    (Gini = 0.36)",
     "Non-concentrated affluence
-    (Gini = 0.40)"
+    (Gini = 0.40)",
+    "Concentrated affluence
+    (Gini = 0.36)"
+  ),
+  name = NULL
+  ) +
+  scale_alpha_manual(values = c(
+    "Non-concentrated affluence" = 0.75,
+    "Concentrated affluence" = 1
+  ),
+  labels = c(
+    "Non-concentrated affluence
+    (Gini = 0.40)",
+    "Concentrated affluence
+    (Gini = 0.36)"
   ),
   name = NULL
   ) +
