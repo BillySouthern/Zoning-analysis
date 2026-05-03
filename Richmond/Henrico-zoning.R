@@ -1506,8 +1506,8 @@ Zoning_Parcels_Income <- st_join(Henrico_Zoning_parcels, Income_LISA_Henrico[, c
 #Outliers
 Outliers <-  Zoning_Parcels_Income %>%
   mutate(`SALE YEAR` = as.numeric(substr(`SALE DATE`, 1, 4))) %>%
-  filter(str_detect(`SALE YEAR`, "2007")) %>%
-  filter(Zoning_Group_Acre %in% c("Large lot zoned parcels")) %>%
+  filter(str_detect(`SALE YEAR`, "2000")) %>%
+  filter(Zoning_Group_Acre %in% c("Small lot zoned parcels")) %>%
   # mutate(
   #   Affluent_Group = Facet != "Concentrated affluence" & Income_2022 >= 138750
   # ) %>%
@@ -1518,16 +1518,17 @@ Outliers <-  Zoning_Parcels_Income %>%
   # mutate(
   #   Facet = if_else(Income_2022 > 138750, 
   #                   "Concentrated affluence", "Non-concentrated affluence")) %>%  
-  filter(Facet %in% c("Non-concentrated affluence")) 
+  filter(Facet %in% c("Concentrated affluence")) 
 
 #Lot size
-OUTLIERS <- c("735-776-0588|741-736-6965|743-735-0975|750-733-4242|755-736-1847|738-747-9304|745-731-9112|738-739-7705|
-               803-680-7933|763-730-8976|750-737-6343|756-741-3706|753-738-7149|754-767-0176|740-781-2953.033|740-781-2953.052|
-               732-771-9082 756-770-3110|756-770-3110|761-773-1380|738-732-1228|742-755-6442|752-734-3747|763-768-8824|764-768-0700|
-               748-732-4135|754-731-8217|769-750-7033|735-775-3488|738-767-5664|737-767-7352|768-768-4680|756-735-8377.905|
-               749-734-4747|811-688-3052|735-778-9229|769-760-7554|748-733-7225|743-733-2625|793-745-2509|745-735-1477|728-759-5517|
-               856-708-3890|740-744-3452|763-731-9711|745-769-7520|752-754-6407|768-778-1006|768-777-1390|741-757-8038|740-738-6948")
+# OUTLIERS <- c("735-776-0588|741-736-6965|743-735-0975|750-733-4242|755-736-1847|738-747-9304|745-731-9112|738-739-7705|
+#                803-680-7933|763-730-8976|750-737-6343|756-741-3706|753-738-7149|754-767-0176|740-781-2953.033|740-781-2953.052|
+#                732-771-9082 756-770-3110|756-770-3110|761-773-1380|738-732-1228|742-755-6442|752-734-3747|763-768-8824|764-768-0700|
+#                748-732-4135|754-731-8217|769-750-7033|735-775-3488|738-767-5664|737-767-7352|768-768-4680|756-735-8377.905|
+#                749-734-4747|811-688-3052|735-778-9229|769-760-7554|748-733-7225|743-733-2625|793-745-2509|745-735-1477|728-759-5517|
+#                856-708-3890|740-744-3452|763-731-9711|745-769-7520|752-754-6407|768-778-1006|768-777-1390|741-757-8038|740-738-6948")
 
+#for third zoning group acre
 OUTLIERS <- c("793-757-4383|746-736-1603|745-736-3594|739-739-6593|741-740-3276|742-740-5584|741-740-8986|742-740-5542|805-737-7793|
               745-735-1477|740-740-5955|741-740-3276|742-740-5584|741-740-8986|742-740-5542|766-754-7342|832-714-1493|814-723-9520|
               819-720-4239|772-765-6720|802-693-3130|800-690-7298|774-755-9001740-740-2098|770-775-4450|731-759-5663|744-738-4036|
@@ -1536,16 +1537,16 @@ OUTLIERS <- c("793-757-4383|746-736-1603|745-736-3594|739-739-6593|741-740-3276|
               750-737-2226|774-755-9001|827-727-2829|778-751-5408")
 
 #Code
-OUTLIERS <-  c("742-739-9837|813-716-6294|759-763-9056|
-               741-739-8043|742-739-2299|742-739-3397|742-739-7443|739-740-6347|
-                759-736-5541|768-778-1006|768-777-1390|744-737-5297|745-735-9855|745-735-9855|768-778-0091|759-736-5541|
-                743-739-1128|745-735-7181|768-776-1349|768-776-3720|741-740-8423|749-737-8502|746-735-5383|742-740-0046|
-                749-736-9080|741-739-5096|741-740-4923|740-740-0840|742-740-5668|741-739-6295|742-739-0356|747-734-9733
-               |768-778-1006|768-777-1390|744-737-5297|745-735-9855|
-               744-738-4036|768-779-2223|742-740-3319|768-778-4940|740-741-4308|740-740-6139|770-774-3118|768-777-8484|
-               741-741-2615|768-779-8627|746-736-2117|746-736-5119|769-778-0780|768-778-9095|768-778-8312|
-               741-740-6659|739-739-8399|745-736-1108|745-737-0325|744-738-3207|748-734-6131|748-736-5779|742-740-3544|742-739-4948|
-               745-736-8018|757-734-2776|752-735-0768")
+# OUTLIERS <-  c("742-739-9837|813-716-6294|759-763-9056|
+#                741-739-8043|742-739-2299|742-739-3397|742-739-7443|739-740-6347|
+#                 759-736-5541|768-778-1006|768-777-1390|744-737-5297|745-735-9855|745-735-9855|768-778-0091|759-736-5541|
+#                 743-739-1128|745-735-7181|768-776-1349|768-776-3720|741-740-8423|749-737-8502|746-735-5383|742-740-0046|
+#                 749-736-9080|741-739-5096|741-740-4923|740-740-0840|742-740-5668|741-739-6295|742-739-0356|747-734-9733|
+#                768-778-1006|768-777-1390|744-737-5297|745-735-9855|
+#                744-738-4036|768-779-2223|742-740-3319|768-778-4940|740-741-4308|740-740-6139|770-774-3118|768-777-8484|
+#                741-741-2615|768-779-8627|746-736-2117|746-736-5119|769-778-0780|768-778-9095|768-778-8312|
+#                741-740-6659|739-739-8399|745-736-1108|745-737-0325|744-738-3207|748-734-6131|748-736-5779|742-740-3544|742-739-4948|
+#                745-736-8018|757-734-2776|752-735-0768")
 
 # #Filter and Median for just affluent tracts
 Zoning_Parcels_Affluent_Median <- Zoning_Parcels_Income %>%
@@ -1594,7 +1595,7 @@ Zoning_Parcels_Income_Median <- Zoning_Parcels_Income %>%
   # arrange(ACRES) %>%  # optional: explicitly sort first
   # mutate(Acres_Tertile = ntile(ACRES, 3)) %>%
   filter(!is.na(Lot_Size)) %>%
-  # filter(!str_detect(PIN, OUTLIERS)) %>%
+  filter(!str_detect(PIN, OUTLIERS)) %>%
   # filter(
   #   CoreLogic_Description %in% c(
   #     # "APARTMENT",
@@ -1761,6 +1762,9 @@ Zoning_Parcels_Income_Median %>%
              # scales = "free_y", 
              space = "free",
              switch = "y") +
+  geom_ribbon(aes(ymin = p25, ymax = p75, fill = Facet),
+              alpha = 0.4,
+              color = NA) +
   # facet_grid(fct_relevel(Lot_Size_Description, "R-6 and Townhouses", "R-5", "R-4", "R-3", "R-2", "A-1, R-0, and R-1") ~ .,
   #            # scales = "free_y", space = "free",
   #            switch = "y"
@@ -1787,6 +1791,9 @@ Zoning_Parcels_Income_Median %>%
   scale_color_manual(values = c("Areas not concentrated affluence" = "grey",
                                 "Concentrated affluence" = "#7f3b08"),
                      name = NULL, guide = "none") +
+  scale_fill_manual(values = c("Areas not concentrated affluence" = "grey",
+                               "Concentrated affluence" = "#7f3b08"), guide = "none",
+                    name = NULL) +
   # scale_color_manual(values = c("General residence district" = "#377eb8",
   #                               "Districts that 'provide and protect'" = "#e41a1c"),
   #                    name = NULL, guide = "none") +
@@ -1807,18 +1814,11 @@ Zoning_Parcels_Income_Median %>%
   #                               "A1" = "solid",
   #                               "R0" = "solid"),
   #                       guide = "none") +
-  # labs(x = "Year of sale",
-  #      y = "Median parcel unit sale value",
-  #      subtitle = NULL,
-  #      # caption = "Color shading represents <span style='color:#4daf4a;'>urban</span>, 
-  #      # <span style='color:#984ea3;'>transitional</span>, and 
-  #      # <span style='color:#fdbf6f;'>suburban</span> census tracts"
-  #      ) +
-  labs(# subtitle = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
-       subtitle = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span>, <span style='color:#8da0cb;'>affluent but not concentrated</span>, and <span style='color:darkgrey;'>not concentrated or affluent</span>",
+  labs(subtitle = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
+       # subtitle = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span>, <span style='color:#8da0cb;'>affluent but not concentrated</span>, and <span style='color:darkgrey;'>not concentrated or affluent</span>",
        x = NULL,
        y = "Median parcel sale value",
-       caption = "All sales adjusted to 2022 dollars"
+       caption = "Ribbon shows interquartile range. All values adjusted to 2022 dollars"
   ) +
   # scale_y_continuous(labels = label_dollar(),
   #                    breaks = c(0, 250000, 500000, 750000, 1000000, 1250000, 1500000),
@@ -1845,6 +1845,149 @@ ggsave("Henrico_Sales_By_LotSize.png",
        path = "~/desktop",
        width = 9,
        height = 12,
+       units = "in",
+       dpi = 500)
+
+#Difference plotting between medians
+Zoning_Parcels_Difference <- Zoning_Parcels_Income_Median %>%
+  st_drop_geometry() %>%
+  select(`SALE YEAR`, Facet, Zoning_Group_Acre,
+         p25, Median_Unit_Value, p75) %>%
+  mutate(group_type = case_when(
+    Facet == "Concentrated affluence" ~ "conc",
+    Facet == "Non-concentrated affluence" ~ "nonconc",
+    TRUE ~ NA_character_)) %>%
+  filter(group_type %in% c("conc", "nonconc")) %>%
+  group_by(`SALE YEAR`, Zoning_Group_Acre, group_type) %>%
+  summarise(
+    median_val = mean(Median_Unit_Value, na.rm = TRUE),
+    p25 = mean(p25, na.rm = TRUE),
+    p75 = mean(p75, na.rm = TRUE),
+    .groups = "drop") %>%
+  pivot_wider(
+    names_from = group_type,
+    values_from = c(median_val, p25, p75)
+  ) %>%
+  mutate(
+    diff_med = median_val_conc - median_val_nonconc,
+    diff_p25 = p25_conc - p25_nonconc,
+    diff_p75 = p75_conc - p75_nonconc,
+    
+    diff_pct = diff_med / median_val_nonconc * 100,
+    diff_log = log(median_val_conc) - log(median_val_nonconc)
+  ) %>%
+  filter(!is.na(median_val_conc),
+         !is.na(median_val_nonconc)) 
+
+#Plot difference
+Zoning_Parcels_Difference %>%
+  # filter(`Zoning_Group_Acre` %in% c("Large lot zoned parcels", "Medium lot zoned parcels")) %>%
+  ggplot(
+    # %>%
+    #   filter((`ZONING CODE` %in% c("A-1", "R-0", "R-1", "R-2", "R-3", "R-4", "R-5", "R-6", "RTH")))
+    aes(x = `SALE YEAR`, y = diff_med, 
+        group = Zoning_Group_Acre), color = "black") +
+  # geom_line(
+  #   data = Zoning_Parcels_Affluent_Median,
+  #   aes(x = `SALE YEAR`,
+  #       y = Median_Unit_Value,
+  #       group = Affluent_Group),
+  #   color = "#8da0cb",
+  #   linewidth = 0.75,
+  #   # linetype = "dashed"
+  # ) +
+  # facet_grid(fct_rev(`Zoning_Group_Acre`) ~ .,
+  #            space = "free",
+  #            switch = "y") +
+  geom_line(size = 1, na.rm = T) +
+  facet_grid(fct_rev(`Zoning_Group_Acre`) ~ .,
+             # scales = "free_y", 
+             space = "free",
+             switch = "y") +
+  # geom_ribbon(aes(ymin = diff_p25, ymax = diff_p75),
+  #             alpha = 0.4,
+  #             color = NA) +
+  # facet_grid(fct_relevel(Lot_Size_Description, "R-6 and Townhouses", "R-5", "R-4", "R-3", "R-2", "A-1, R-0, and R-1") ~ .,
+  #            # scales = "free_y", space = "free",
+  #            switch = "y"
+  # ) +
+  # geom_rect(aes(xmin = start, xmax = above200_end, ymin = 0, ymax = Inf,
+  #               fill = Transitional), col = NA, alpha = 1) +  
+  # geom_vline(xintercept = seq(0, 36.5, by = 5), color = "black", alpha = 0.5, linetype = "solid", size = 0.2) +  # geom_vline(xintercept = 8.94, color = 'darkgrey', linetype = 'solid', linewidth = 0.25) +
+  # geom_vline(xintercept = distances$x, color = "black", linetype = "longdash", size = 1) +
+  geom_vline(xintercept = 1960, color = "black", linetype = "solid", size = 0.75) +
+  # geom_text(data = Henrico_Med_Test %>% filter(`Lot_Size` == "Larger than 0.75 acres"),  # Filtering inside the layer
+  #           aes(x = 1960.25, y = 750000, angle = 0, label = "1960 zoning ordinance"),
+  #           hjust = 0, color = "black", size = 3.5) +
+  geom_vline(xintercept = 2021, color = "black", linetype = "solid", size = 0.75) +
+  # geom_text(data = Henrico_Med_Test %>% filter(`Lot_Size` == "Larger than 0.75 acres"),  # Filtering inside the layer
+  #           aes(x = 2008.5, y = 750000, angle = 0, label = "2021 zoning ordinance"),
+  #           hjust = 0, color = "black", size = 3.5) +
+  # scale_fill_manual(values = c("Urban" = "#c8edc7", "Unstable" = "#e8c2ed", "Suburban" = "#fae3c5"), guide = "none") +
+  # geom_smooth(span = 0.1, method = "loess", fill = "lightgrey", alpha = 0, size = 0.85) +
+  # geom_hline(yintercept = 1, color = 'black', linetype = 'dashed') +
+  theme_minimal() +
+  scale_y_continuous(labels = label_dollar(),
+                     breaks = c(0, 100000, 200000, 300000, 400000),
+                     position = "right") +
+  # scale_color_manual(values = c("Areas not concentrated affluence" = "grey",
+  #                               "Concentrated affluence" = "#7f3b08"),
+  #                    name = NULL, guide = "none") +
+  # scale_fill_manual(values = c("Areas not concentrated affluence" = "grey",
+  #                              "Concentrated affluence" = "#7f3b08"), guide = "none",
+  #                   name = NULL) +
+  # scale_color_manual(values = c("General residence district" = "#377eb8",
+  #                               "Districts that 'provide and protect'" = "#e41a1c"),
+  #                    name = NULL, guide = "none") +
+  # scale_color_manual(values = c("Areas of concentrated affluence" = "#7f3b08",
+  #                              "Areas not concentrated affluence" = "darkgrey"),
+  #                   name = NULL, guide = "none") +
+  # scale_color_manual(values = c("Standard R code" = "black",
+  #                               "A subcodes" = "#1f78b4",
+  #                               "AC subcodes" = "#a6cee3",
+  #                               "C subcodes" = "#bdbdbd",
+  #                               "Townhouses" = "#998ec3",
+  #                               "A1" = "#1b9e77",
+  #                               "R0" = "#d95f02"),
+  #                    name = NULL) +
+  # scale_linetype_manual(values = c("A, C, and AC" = "dashed",
+  #                               "Standard R code" = "solid",
+  #                               "Townhouses" = "dashed",
+  #                               "A1" = "solid",
+  #                               "R0" = "solid"),
+  #                       guide = "none") +
+  labs(subtitle = "Difference in median parcel values in areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> over those <span style='color:darkgrey;'>not concentrated affluence</span>",
+       # subtitle = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span>, <span style='color:#8da0cb;'>affluent but not concentrated</span>, and <span style='color:darkgrey;'>not concentrated or affluent</span>",
+       x = NULL,
+       y = "Median parcel sale value",
+       # caption = "Ribbon shows interquartile range. All values adjusted to 2022 dollars"
+  ) +
+  # scale_y_continuous(labels = label_dollar(),
+  #                    breaks = c(0, 250000, 500000, 750000, 1000000, 1250000, 1500000),
+  #                    position = "right") +
+  scale_x_continuous(breaks = c(1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020)) +
+  coord_cartesian(xlim=c(1980, 2020),
+                  ylim = c(0, 500000)) +
+  theme(plot.subtitle = element_markdown(hjust = 0.5, size = 13, face = "bold"),
+        strip.placement = "outside",
+        strip.text.y = element_markdown(size = 12, face = "bold"), 
+        axis.text.x = element_text(size = 11, hjust = 0.5, vjust = 0.825),
+        axis.text.y = element_markdown(size = 12),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        legend.position = "right",
+        axis.title.x = element_blank(),
+        axis.title.y = element_markdown(size = 14),
+        panel.grid.major.x = element_line(size = 0.2, color = "darkgrey"),
+        panel.grid.minor.x = element_line(size = 0.2, color = "lightgrey"),
+        panel.grid.major.y = element_line(size = 0.2, color = "grey"),
+        panel.grid.minor.y = element_line(size = 0.1),
+        panel.border = element_rect(color = "black", fill = NA, size = 0.75)
+  ) 
+
+ggsave("Henrico_Parcel_Difference.png",
+       path = "~/desktop",
+       width = 11,
+       height = 7,
        units = "in",
        dpi = 500)
 
