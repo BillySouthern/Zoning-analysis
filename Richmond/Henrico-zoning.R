@@ -2072,18 +2072,20 @@ ggsave("Ridges_Sales_Values_Zoning_Size.png",
 #Tidy for facet plots of above
 Facet_Plottng <- Zoning_Parcels_Income_Ridges %>%
   mutate(`SALE YEAR` = as.numeric(substr(`SALE DATE`, 1, 4))) %>%
-  mutate(Median_Unit_Value_Inf = adjust_for_inflation(`SALE AMOUNT`, 
+  mutate(Median_Unit_Value_Inf = adjust_for_inflation(`SALE AMOUNT`,
                                                       `SALE YEAR`, "US", to_date = 2022)) %>%
   select(PIN, ACRES, `YEAR BUILT`, Median_Unit_Value_Inf, `SALE YEAR`, Facet, Zoning_Group_Acre) %>%
+  # select(PIN, ACRES, `YEAR BUILT`, `SALE AMOUNT`, `SALE YEAR`, Facet, Zoning_Group_Acre) %>%
   # filter(!str_detect(PIN, OUTLIERS)) %>%
   # filter(!`ZONING CODE` %in% c("RMH", "RMP")) %>%
-  filter(!Zoning_Group_Acre %in% c("Agricultural")) 
+  filter(!Zoning_Group_Acre %in% c("Agricultural")) %>%
   st_drop_geometry() %>%
   rename("Acres" = ACRES,
     "Year Built" = `YEAR BUILT`,
-    "Most Recent Sale Year" = `SALE YEAR`
+    "Most Recent Sale Year" = `SALE YEAR`,
+    "Most Recent Sale Value" = Median_Unit_Value_Inf
   ) %>%
-  pivot_longer(cols = c("Year Built", "Most Recent Sale Year", Acres, Median_Unit_Value_Inf),
+  pivot_longer(cols = c("Year Built", "Most Recent Sale Year", Acres, "Most Recent Sale Value"),
     names_to = "variable",
     values_to = "value"
   ) %>%
@@ -2091,23 +2093,34 @@ mutate(value = case_when(
     variable == "Acres" ~ pmin(pmax(value, 0), 14),
     variable == "Year Built" ~ pmin(pmax(value, 1930), 2020),
     variable == "Most Recent Sale Year" ~ pmin(pmax(value, 1930), 2020),
-    TRUE ~ value))
+    variable == "Most Recent Sale Value" ~ pmin(pmax(value, 0), 1750000),
+    TRUE ~ value)) %>%
+  mutate(Facet = recode(Facet,
+                        "Non-concentrated affluence" = "Non-concentrated\naffluence",
+                        "Concentrated affluence"     = "Concentrated\naffluence"),
+         Zoning_Group_Acre = recode(Zoning_Group_Acre,
+                                    "Small lot zoned parcels" = "Small lot",
+                                    "Medium lot zoned parcels" = "Medium lot",
+                                    "Large lot zoned parcels" = "Large lot"))
 
 #Plot facet
-Facet_Plottng %>%
+p1 <- Facet_Plottng %>%
   filter(!`Zoning_Group_Acre` %in% c("Very Large lot zoned parcels")) %>%
   filter(!is.na(value)) %>%
+  filter(`variable` %in% c("Year Built", "Most Recent Sale Year")) %>%
   ggplot(aes(x = value, y = Facet)) +
   geom_density_ridges(aes(fill = Facet), quantile_lines = TRUE,
     quantiles = 2, scale = 0.8, rel_min_height = 0.001,   
     color = "black", alpha = 0.9) +
   facet_grid(`Zoning_Group_Acre` ~ variable, scales = "free", switch = "y") +
   scale_fill_manual(values = c(
-      "Concentrated affluence" = "#7f3b08",
-      "Non-concentrated affluence" = "grey"
+      "Concentrated\naffluence" = "#7f3b08",
+      "Non-concentrated\naffluence" = "grey"
     ),
     guide = "none") +
-  scale_x_continuous() +
+  scale_x_continuous(
+    breaks = c(1920, 1950, 1980, 2010)
+  ) +
   labs(
     title = "Distributions of Parcel Characteristics by Zoning Group and Affluence",
     x = NULL,
@@ -2117,20 +2130,65 @@ Facet_Plottng %>%
   theme(
     plot.title = element_text(face = "bold", hjust = 0.5),
     axis.text.y = element_text(angle = 0),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    strip.text.y = element_text(face = "bold", size = 12),
-    strip.text.x = element_text(face = "bold", size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
+    strip.text.y = element_text(face = "bold", size = 13),
+    strip.text.x = element_text(face = "bold", size = 13),
     strip.placement = "outside",
     panel.spacing = unit(1, "lines"),
     panel.grid.major.x = element_line(color = "grey80", size = 0.2),
     panel.grid.minor = element_line(color = "grey90", size = 0.1),
-    panel.border = element_rect(color = "black", fill = NA, size = 0.7)
+    panel.border = element_rect(color = "black", fill = NA, size = 0.7),
+    panel.spacing.x = unit(0.5, "lines"),
+    panel.spacing.y = unit(0.75, "lines")
   )
+
+p2 <- Facet_Plottng %>%
+  filter(!`Zoning_Group_Acre` %in% c("Very Large lot zoned parcels")) %>%
+  filter(!is.na(value)) %>%
+  filter(`variable` %in% c("Acres", "Most Recent Sale Value")) %>%
+  ggplot(aes(x = value, y = Facet)) +
+  geom_density_ridges(aes(fill = Facet), quantile_lines = TRUE,
+                      quantiles = 2, scale = 0.8, rel_min_height = 0.001,   
+                      color = "black", alpha = 0.9) +
+  facet_grid(`Zoning_Group_Acre` ~ variable, scales = "free", switch = "y") +
+  scale_fill_manual(values = c(
+    "Concentrated\naffluence" = "#7f3b08",
+    "Non-concentrated\naffluence" = "grey"
+  ),
+  guide = "none") +
+  scale_x_continuous(
+    labels = function(x) {
+      ifelse(abs(x) >= 10000,
+             scales::dollar(x),
+             x)}) +
+  labs(
+    # title = "Distributions of Parcel Characteristics by Zoning Group and Affluence",
+    x = NULL,
+    y = NULL) +
+  coord_cartesian() +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.text.y = element_text(angle = 0),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
+    strip.text.y = element_text(face = "bold", size = 13),
+    strip.text.x = element_text(face = "bold", size = 13),
+    strip.placement = "outside",
+    panel.spacing = unit(1, "lines"),
+    panel.grid.major.x = element_line(color = "grey80", size = 0.2),
+    panel.grid.minor = element_line(color = "grey90", size = 0.1),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.7),
+    panel.spacing.x = unit(0.5, "lines"),
+    panel.spacing.y = unit(0.75, "lines"))
+
+p1 / p2 +
+  plot_layout(heights = c(1, 1)) &
+  theme(plot.margin = margin(t = 0, r = 5, b = 0, l = 5))
 
 ggsave("Parcel_Char_Facet.png",
        path = "~/desktop",
        width = 11,
-       height = 9,
+       height = 13,
        units = "in",
        dpi = 500)
 
