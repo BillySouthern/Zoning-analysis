@@ -1482,9 +1482,9 @@ Zoning_Parcels_Income <- st_join(Henrico_Zoning_parcels, Income_LISA_Henrico[, c
       `ZONING CODE` %in% c("R-0", "RC") ~ "Large lot zoned parcels",
       `ZONING CODE` %in% c("RR-1", "R-1", "R-1A") ~ "Large lot zoned parcels",
       `ZONING CODE` %in% c("R-2", "R-2C", "R-2A", "R-2AC", "R-3AC", "R-3C", "R-3", "R-3A") &
-        ACRES > 1 ~ "Large lot zoned parcels",
+        ACRES > 1.5 ~ "Large lot zoned parcels",
       `ZONING CODE` %in% c("R-2", "R-2C", "R-2A", "R-2AC", "R-3AC", "R-3C", "R-3", "R-3A") &
-        ACRES <= 1 ~ "Medium lot zoned parcels",
+        ACRES <= 1.5 ~ "Medium lot zoned parcels",
       `ZONING CODE` %in% c("R-5", "R-5A", "R-5AC", "R-5C", "R-6", "R-6C", "RTH", "RTHC",
                            "RMP", "R-4", "R-4A", "R-4AC", "RM", "RS") ~ "Small lot zoned parcels",
       TRUE ~ NA_character_ ))
@@ -1506,7 +1506,7 @@ Zoning_Parcels_Income <- st_join(Henrico_Zoning_parcels, Income_LISA_Henrico[, c
 #Outliers
 Outliers <-  Zoning_Parcels_Income %>%
   mutate(`SALE YEAR` = as.numeric(substr(`SALE DATE`, 1, 4))) %>%
-  filter(str_detect(`SALE YEAR`, "2000")) %>%
+  filter(str_detect(`SALE YEAR`, "1980")) %>%
   filter(Zoning_Group_Acre %in% c("Small lot zoned parcels")) %>%
   # mutate(
   #   Affluent_Group = Facet != "Concentrated affluence" & Income_2022 >= 138750
@@ -1521,32 +1521,37 @@ Outliers <-  Zoning_Parcels_Income %>%
   filter(Facet %in% c("Concentrated affluence")) 
 
 #Lot size
-# OUTLIERS <- c("735-776-0588|741-736-6965|743-735-0975|750-733-4242|755-736-1847|738-747-9304|745-731-9112|738-739-7705|
-#                803-680-7933|763-730-8976|750-737-6343|756-741-3706|753-738-7149|754-767-0176|740-781-2953.033|740-781-2953.052|
-#                732-771-9082 756-770-3110|756-770-3110|761-773-1380|738-732-1228|742-755-6442|752-734-3747|763-768-8824|764-768-0700|
-#                748-732-4135|754-731-8217|769-750-7033|735-775-3488|738-767-5664|737-767-7352|768-768-4680|756-735-8377.905|
-#                749-734-4747|811-688-3052|735-778-9229|769-760-7554|748-733-7225|743-733-2625|793-745-2509|745-735-1477|728-759-5517|
-#                856-708-3890|740-744-3452|763-731-9711|745-769-7520|752-754-6407|768-778-1006|768-777-1390|741-757-8038|740-738-6948")
-
-#for third zoning group acre
-OUTLIERS <- c("793-757-4383|746-736-1603|745-736-3594|739-739-6593|741-740-3276|742-740-5584|741-740-8986|742-740-5542|805-737-7793|
-              745-735-1477|740-740-5955|741-740-3276|742-740-5584|741-740-8986|742-740-5542|766-754-7342|832-714-1493|814-723-9520|
-              819-720-4239|772-765-6720|802-693-3130|800-690-7298|774-755-9001740-740-2098|770-775-4450|731-759-5663|744-738-4036|
-              804-691-1459|808-705-3773741-759-9411|745-769-7520|741-777-7897|741-759-9411|739-741-3559|746-735-6198|806-676-7240|
-              803-692-2373|815-722-8456|768-779-2223|742-740-3319|770-754-0948|757-746-9814|772-765-6720|802-693-3130|742-740-5542|
-              750-737-2226|774-755-9001|827-727-2829|778-751-5408")
-
-#Code
-# OUTLIERS <-  c("742-739-9837|813-716-6294|759-763-9056|
-#                741-739-8043|742-739-2299|742-739-3397|742-739-7443|739-740-6347|
-#                 759-736-5541|768-778-1006|768-777-1390|744-737-5297|745-735-9855|745-735-9855|768-778-0091|759-736-5541|
-#                 743-739-1128|745-735-7181|768-776-1349|768-776-3720|741-740-8423|749-737-8502|746-735-5383|742-740-0046|
-#                 749-736-9080|741-739-5096|741-740-4923|740-740-0840|742-740-5668|741-739-6295|742-739-0356|747-734-9733|
-#                768-778-1006|768-777-1390|744-737-5297|745-735-9855|
-#                744-738-4036|768-779-2223|742-740-3319|768-778-4940|740-741-4308|740-740-6139|770-774-3118|768-777-8484|
-#                741-741-2615|768-779-8627|746-736-2117|746-736-5119|769-778-0780|768-778-9095|768-778-8312|
-#                741-740-6659|739-739-8399|745-736-1108|745-737-0325|744-738-3207|748-734-6131|748-736-5779|742-740-3544|742-739-4948|
-#                745-736-8018|757-734-2776|752-735-0768")
+OUTLIERS <- c(
+  "728-759-5517","731-759-5663","732-771-9082","735-775-3488","735-776-0588",
+  "735-778-9229","737-767-7352","738-732-1228","738-739-7705","738-747-9304",
+  "738-767-5664","739-739-6593","739-739-8399","739-740-6347","739-741-3559",
+  "740-738-6948","740-740-0840","740-740-2098","740-740-5955","740-740-6139",
+  "740-741-4308","740-744-3452","740-781-2953.033","740-781-2953.052",
+  "741-736-6965","741-739-5096","741-739-6295","741-739-8043","741-740-3276",
+  "741-740-4923","741-740-6659","741-740-8423","741-740-8986","741-741-2615",
+  "741-757-8038","741-759-9411","741-777-7897","742-739-0356","742-739-2299","742-739-3397","742-739-4948","742-739-7443",
+  "742-739-9837","742-740-0046","742-740-3319","742-740-3544","742-740-5542",
+  "742-740-5584","742-740-5668","743-733-2625","743-735-0975","743-739-1128",
+  "744-737-5297","744-738-3207","744-738-4036","745-731-9112","745-735-1477","745-735-7181","745-735-9855",
+  "745-736-1108","745-736-1603","745-736-3594","745-736-8018",
+  "745-737-0325","745-769-7520","746-735-5383","746-735-6198","746-736-2117","746-736-5119",
+  "747-734-9733","748-732-4135","748-733-7225","748-734-6131","748-736-5779",
+  "749-734-4747","749-736-9080","749-737-8502",
+  "750-733-4242","750-737-2226","750-737-6343",
+  "752-734-3747","752-735-0768","752-754-6407", "741-777-7897",
+  "753-738-7149","754-731-8217","754-767-0176", "747-738-6173.033",
+  "755-736-1847","756-735-8377.905","756-741-3706","756-770-3110",
+  "757-734-2776","757-746-9814","759-736-5541","759-763-9056", "761-773-1380","763-730-8976",
+  "763-731-9711","763-768-8824", "764-768-0700", "766-754-7342","768-768-4680","768-776-1349",
+  "768-776-3720","768-777-1390","768-777-8484","768-778-0091","768-778-1006","768-778-4940",
+  "768-778-8312","768-778-9095","768-779-2223","768-779-8627",
+  "769-750-7033","769-760-7554","769-778-0780",
+  "770-754-0948","770-774-3118","770-775-4450",
+  "772-765-6720","774-755-9001","778-751-5408","793-745-2509","793-757-4383",
+  "800-690-7298","802-693-3130","803-680-7933","803-692-2373",
+  "804-691-1459","805-737-7793","806-676-7240","808-705-3773",
+  "811-688-3052","813-716-6294","814-723-9520","815-722-8456",
+  "819-720-4239","827-727-2829","832-714-1493","856-708-3890", "747-738-9962")
 
 # #Filter and Median for just affluent tracts
 Zoning_Parcels_Affluent_Median <- Zoning_Parcels_Income %>%
@@ -1563,7 +1568,7 @@ Zoning_Parcels_Affluent_Median <- Zoning_Parcels_Income %>%
   # arrange(ACRES) %>%  # optional: explicitly sort first
   # mutate(Acres_Tertile = ntile(ACRES, 3)) %>%
   filter(!is.na(Lot_Size)) %>%
-  filter(!str_detect(PIN, OUTLIERS)) %>%
+  filter(!PIN %in% OUTLIERS) %>%
   filter(
     !is.na(`SALE AMOUNT`),
     !is.na(`SALE YEAR`))  %>%
@@ -1595,7 +1600,7 @@ Zoning_Parcels_Income_Median <- Zoning_Parcels_Income %>%
   # arrange(ACRES) %>%  # optional: explicitly sort first
   # mutate(Acres_Tertile = ntile(ACRES, 3)) %>%
   filter(!is.na(Lot_Size)) %>%
-  filter(!str_detect(PIN, OUTLIERS)) %>%
+  filter(!PIN %in% OUTLIERS) %>%
   # filter(
   #   CoreLogic_Description %in% c(
   #     # "APARTMENT",
@@ -1956,7 +1961,7 @@ Zoning_Parcels_Difference %>%
   #                               "A1" = "solid",
   #                               "R0" = "solid"),
   #                       guide = "none") +
-  labs(subtitle = "Difference in median parcel values in areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> over those <span style='color:darkgrey;'>not concentrated affluence</span>",
+  labs(subtitle = "Difference in median parcel values for areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> over those <span style='color:darkgrey;'>not concentrated affluence</span>",
        # subtitle = "Parcel values across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span>, <span style='color:#8da0cb;'>affluent but not concentrated</span>, and <span style='color:darkgrey;'>not concentrated or affluent</span>",
        x = NULL,
        y = "Median parcel sale value",
@@ -2066,13 +2071,19 @@ ggsave("Ridges_Sales_Values_Zoning_Size.png",
 
 #Tidy for facet plots of above
 Facet_Plottng <- Zoning_Parcels_Income_Ridges %>%
-  select(PIN, ACRES, `YEAR BUILT`, `SALE YEAR`, Facet, Zoning_Group_Acre) %>%
+  mutate(`SALE YEAR` = as.numeric(substr(`SALE DATE`, 1, 4))) %>%
+  mutate(Median_Unit_Value_Inf = adjust_for_inflation(`SALE AMOUNT`, 
+                                                      `SALE YEAR`, "US", to_date = 2022)) %>%
+  select(PIN, ACRES, `YEAR BUILT`, Median_Unit_Value_Inf, `SALE YEAR`, Facet, Zoning_Group_Acre) %>%
+  # filter(!str_detect(PIN, OUTLIERS)) %>%
+  # filter(!`ZONING CODE` %in% c("RMH", "RMP")) %>%
+  filter(!Zoning_Group_Acre %in% c("Agricultural")) 
   st_drop_geometry() %>%
   rename("Acres" = ACRES,
     "Year Built" = `YEAR BUILT`,
     "Most Recent Sale Year" = `SALE YEAR`
   ) %>%
-  pivot_longer(cols = c("Year Built", "Most Recent Sale Year", Acres),
+  pivot_longer(cols = c("Year Built", "Most Recent Sale Year", Acres, Median_Unit_Value_Inf),
     names_to = "variable",
     values_to = "value"
   ) %>%
@@ -3018,7 +3029,7 @@ p_diff <- diff_plot %>%
   ggplot(aes(x = income_bin_25k, y = diff)) +
   geom_col(fill = "black") +
   geom_hline(yintercept = 0, linetype = "solid") +
-  coord_cartesian(ylim = c(-0.2, 0.2)) +  # adjust as needed
+  coord_cartesian(ylim = c(-0.2, 0.45)) +  # adjust as needed
   theme_minimal(base_size = 14) +
   labs(
     subtitle = "Distribution of household incomes across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
@@ -3039,13 +3050,14 @@ p_diff <- diff_plot %>%
       labels = scales::label_percent())
 
 #Combine here
-p_diff / p_bars
+(p_diff / p_bars) +
+  plot_layout(heights = c(1, 1.3))
 
 #To save
 ggsave("Income_Differences.png",
        path = "~/desktop",
        width = 9.5,
-       height = 8,
+       height = 9,
        units = "in",
        dpi = 500)
 
