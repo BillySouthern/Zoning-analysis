@@ -2122,12 +2122,14 @@ p1 <- Facet_Plottng %>%
     breaks = c(1920, 1950, 1980, 2010)
   ) +
   labs(
-    title = "Distributions of Parcel Characteristics by Zoning Group and Affluence",
+    # title = "Distributions of Parcel Characteristics by Zoning Group and Affluence",
+    subtitle = "Parcel characteristics across areas of<br><span style='color:#7f3b08;'>concentrated affluence</span> and those <span style='color:darkgrey;'>not concentrated affluence</span>",
     x = NULL,
     y = NULL) +
   coord_cartesian() +
   theme_minimal(base_size = 14) +
   theme(
+    plot.subtitle = element_markdown(hjust = 0.5, size = 18, face = "bold"),
     plot.title = element_text(face = "bold", hjust = 0.5),
     axis.text.y = element_text(angle = 0),
     axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
