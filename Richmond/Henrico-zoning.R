@@ -2919,8 +2919,8 @@ Zoning_Parcels_Income %>%
 #To save
 ggsave("FAR_L.png",
        path = "~/desktop",
-       width = 7,
-       height = 4.5,
+       width = 6,
+       height = 4,
        units = "in",
        dpi = 500)
 
